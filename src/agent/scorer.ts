@@ -1,10 +1,12 @@
 /**
  * Scorer - Expected Return Calculation
- * Links to spec Section 5 (Multi-Factor Scoring)
+ * Links to PRD Section 4 (Scoring System - formal)
+ *
+ * Formula: expected_return = 0.40 × catalyst + 0.30 × momentum + 0.20 × upside + 0.10 × timing
  */
 
 import { CatalystSignals } from './scanner.js';
-import { calculateIndicators, calculateSMA } from '../utils/indicators.js';
+import { calculateIndicators, calculateRSI, calculateMACD } from '../utils/indicators.js';
 import { CandleData } from '../data/market_data.js';
 
 export interface Score {
@@ -14,23 +16,24 @@ export interface Score {
 }
 
 export interface ScoreComponents {
-  catalystScore: number; // 40% weight
-  momentumScore: number; // 30% weight
-  upsideScore: number; // 20% weight
-  timingScore: number; // 10% weight
+  catalystScore: number; // 40% weight - [0,1]
+  momentumScore: number; // 30% weight - [-1,1] normalized
+  upsideScore: number; // 20% weight - [0,1]
+  timingScore: number; // 10% weight - [-0.5,0.5] discrete
 }
 
 export class Scorer {
   /**
-   * Score a ticker based on multi-factor model
-   * Per spec Section 5: 40% catalyst + 30% momentum + 20% upside + 10% timing
+   * Score a ticker based on PRD multi-factor model
+   * Per PRD Section 4: 40% catalyst + 30% momentum + 20% upside + 10% timing
    */
   scoreTickerWithCandles(
     ticker: string,
     candles: CandleData,
-    catalyst: CatalystSignals
+    catalyst: CatalystSignals,
+    analystTargetPrice?: number
   ): Score {
-    if (candles.prices.length < 26) {
+    if (candles.prices.length < 50) {
       return {
         ticker,
         expectedReturn: 0,
@@ -47,50 +50,22 @@ export class Scorer {
     const indicators = calculateIndicators(candles.prices, candles.volumes);
 
     // Component 1: Catalyst Score (40% weight)
-    // Use aggregated catalyst signals
-    const catalystScore = catalyst.aggregatedScore;
+    // PRD: catalyst_strength ∈ [0,1] is sum of triggered signal weights (clipped at 1)
+    const catalystScore = Math.min(1.0, Math.max(0.0, catalyst.aggregatedScore));
 
-    // Component 2: Momentum Score (30% weight)
-    // Combine RSI (normalized) and recent price performance
-    const rsiNormalized = Math.max(0, Math.min(1, indicators.rsi / 100));
-    const sma20 = calculateSMA(candles.prices, 20);
-    const sma50 = calculateSMA(candles.prices, 50);
-    const priceAboveMA =
-      sma20 > 0
-        ? Math.min(1, Math.max(0, (currentPrice - sma20) / (sma50 - sma20 + 0.001)))
-        : 0;
+    // Component 2: Momentum Acceleration (30% weight)
+    // PRD: momentum_acceleration ∈ [-1,1] = normalized RSI delta + normalized MACD histogram delta
+    const momentumScore = this.calculateMomentumAcceleration(candles);
 
-    const momentumScore = rsiNormalized * 0.4 + priceAboveMA * 0.6;
+    // Component 3: Upside Potential (20% weight)
+    // PRD: upside_potential ∈ [0,1] = min(1.0, (analyst_target_price - current_price)/current_price)
+    const upsideScore = this.calculateUpsidePotential(currentPrice, analystTargetPrice);
 
-    // Component 3: Upside Score (20% weight)
-    // Estimate potential upside based on volatility and recent performance
-    const high52 = Math.max(...candles.prices.slice(-260));
-    const low52 = Math.min(...candles.prices.slice(-260));
-    const distanceFromHigh = (high52 - currentPrice) / currentPrice;
-    const volatilityRatio = (high52 - low52) / low52;
+    // Component 4: Timing Factor (10% weight)
+    // PRD: timing_factor ∈ [-0.5,0.5] with discrete buckets based on RSI/MACD
+    const timingScore = this.calculateTimingFactor(indicators);
 
-    // If price is well below high, upside potential exists
-    const upsideScore = Math.min(
-      1,
-      Math.max(0, distanceFromHigh * 2 + volatilityRatio * 0.5)
-    );
-
-    // Component 4: Timing Score (10% weight)
-    // Measures how "hot" the stock is - recent volume, RSI momentum
-    const volumeRatio = indicators.volumeRatio;
-    const volumeScore = Math.min(1, volumeRatio / 2);
-
-    // RSI moving direction (increasing = better timing)
-    const recentRSI = calculateIndicators(
-      candles.prices.slice(-30),
-      candles.volumes.slice(-30)
-    ).rsi;
-    const rsiMomentum =
-      indicators.rsi > recentRSI ? (indicators.rsi - 50) / 50 : 0;
-
-    const timingScore = volumeScore * 0.5 + Math.max(0, rsiMomentum) * 0.5;
-
-    // Calculate weighted expected return
+    // Calculate weighted expected return per PRD formula
     const expectedReturn =
       catalystScore * 0.4 +
       momentumScore * 0.3 +
@@ -110,21 +85,80 @@ export class Scorer {
   }
 
   /**
-   * Apply momentum acceleration
-   * Per spec: Higher score = more aggressively rotated
+   * Calculate momentum acceleration using RSI and MACD deltas
+   * PRD: normalized RSI delta + normalized MACD histogram delta ∈ [-1, 1]
    */
-  applyMomentumAcceleration(score: number): number {
-    if (score < 0.3) {
-      return score * 0.8; // Depress low scores
-    } else if (score > 0.7) {
-      return score * 1.1; // Boost high scores
+  private calculateMomentumAcceleration(candles: CandleData): number {
+    if (candles.prices.length < 30) return 0;
+
+    // Calculate current RSI
+    const currentRSI = calculateRSI(candles.prices, 14);
+
+    // Calculate previous RSI (5 periods ago for meaningful delta)
+    const prevPrices = candles.prices.slice(0, -5);
+    const prevRSI = calculateRSI(prevPrices, 14);
+
+    // RSI delta: range [-100, 100], normalize to [-1, 1]
+    const rsiDelta = (currentRSI - prevRSI) / 100;
+
+    // Calculate current and previous MACD histogram
+    const currentMACD = calculateMACD(candles.prices);
+    const prevMACD = calculateMACD(prevPrices);
+
+    // MACD histogram delta (already in price units, normalize by typical range)
+    const macdDelta = currentMACD.histogram - prevMACD.histogram;
+    const normalizedMacdDelta = Math.max(-1, Math.min(1, macdDelta / 10)); // Assume ±10 is typical range
+
+    // Combine: normalized RSI delta + normalized MACD delta, bounded to [-1, 1]
+    const momentumAcceleration = (rsiDelta + normalizedMacdDelta) / 2;
+
+    return Math.max(-1, Math.min(1, momentumAcceleration));
+  }
+
+  /**
+   * Calculate upside potential using analyst target price
+   * PRD: min(1.0, (analyst_target - current) / current)
+   */
+  private calculateUpsidePotential(currentPrice: number, analystTargetPrice?: number): number {
+    if (!analystTargetPrice || analystTargetPrice <= 0) {
+      // No analyst target available - use conservative estimate based on volatility
+      return 0.1; // Conservative 10% upside when no target available
     }
-    return score;
+
+    const upside = (analystTargetPrice - currentPrice) / currentPrice;
+    return Math.min(1.0, Math.max(0.0, upside));
+  }
+
+  /**
+   * Calculate timing factor using discrete RSI buckets
+   * PRD Section 4:
+   * - RSI 40–60 & MACD just crossed bullish: +0.5
+   * - RSI 60–70 & MACD positive: +0.25
+   * - RSI 70–75: 0
+   * - RSI > 75 or MACD weakening: -0.5
+   */
+  private calculateTimingFactor(indicators: { rsi: number; macdHistogram: number; macd: number; macdSignal: number }): number {
+    const rsi = indicators.rsi;
+    const macdPositive = indicators.macdHistogram > 0;
+    const macdBullish = indicators.macd > indicators.macdSignal;
+
+    // Discrete bucket logic per PRD
+    if (rsi >= 40 && rsi <= 60 && macdBullish) {
+      return 0.5; // Early entry zone with bullish MACD
+    } else if (rsi > 60 && rsi <= 70 && macdPositive) {
+      return 0.25; // Momentum continuing
+    } else if (rsi > 70 && rsi <= 75) {
+      return 0; // Neutral - getting extended
+    } else if (rsi > 75 || !macdPositive) {
+      return -0.5; // Overbought or weakening
+    } else {
+      return 0; // Default neutral
+    }
   }
 
   /**
    * Calculate rotation threshold
-   * Per spec Section 7: Threshold = 0.02 for aggressive rotation
+   * Per PRD Section 6: Threshold = 0.02 for aggressive rotation
    */
   getRotationThreshold(): number {
     return 0.02; // 2% differential triggers rotation

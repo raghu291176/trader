@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+frontend/node_modules
+npm-debug.log*
+
+# Build outputs
+dist
+frontend/dist
+.cache
+
+# Environment files (will be injected by Azure)
+.env
+.env.local
+.env.*.local
+frontend/.env
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+.ai-standards/
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+coverage/
+.nyc_output/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+.prettierrc
+.eslintrc.json
+qa-test.sh
+public/auth-example.html

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Rotation Agent - Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>📊 Portfolio Rotation Agent</h1>
+            <p class="subtitle">Return-Maximization Trading System with LangChain Reasoning</p>
+        </header>
+
+        <!-- Portfolio Overview -->
+        <section class="overview">
+            <div class="stat-card">
+                <div class="stat-label">Portfolio Value</div>
+                <div class="stat-value" id="totalValue">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Cash Available</div>
+                <div class="stat-value" id="cash">$0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Unrealized P&L</div>
+                <div class="stat-value" id="unrealizedPnL">$0.00</div>
+                <div class="stat-percent" id="unrealizedPnLPercent">0.00%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Max Drawdown</div>
+                <div class="stat-value warning" id="maxDrawdown">0.00%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Positions</div>
+                <div class="stat-value" id="positionCount">0</div>
+            </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="actions">
+            <button class="btn btn-primary" onclick="analyzeWatchlist()">🔍 Analyze Watchlist</button>
+            <button class="btn btn-success" onclick="executeRotation()">⚡ Execute Rotation</button>
+            <button class="btn btn-secondary" onclick="refreshDashboard()">🔄 Refresh</button>
+        </section>
+
+        <!-- Main Content Grid -->
+        <div class="grid">
+            <!-- Score Rankings -->
+            <section class="card">
+                <h2>📈 Score Rankings</h2>
+                <div class="table-wrapper">
+                    <table id="scoresTable">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Ticker</th>
+                                <th>Score</th>
+                                <th>Catalyst</th>
+                                <th>Momentum</th>
+                                <th>Upside</th>
+                                <th>Timing</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scoresBody">
+                            <tr><td colspan="7" class="empty">Click "Analyze Watchlist" to see scores</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Current Positions -->
+            <section class="card">
+                <h2>💼 Active Positions</h2>
+                <div class="table-wrapper">
+                    <table id="positionsTable">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Shares</th>
+                                <th>Entry</th>
+                                <th>Current</th>
+                                <th>P&L</th>
+                                <th>P&L %</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positionsBody">
+                            <tr><td colspan="7" class="empty">No active positions</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Trade History -->
+        <section class="card">
+            <h2>📜 Recent Trades</h2>
+            <div class="table-wrapper">
+                <table id="tradesTable">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Type</th>
+                            <th>Ticker</th>
+                            <th>Shares</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tradesBody">
+                        <tr><td colspan="7" class="empty">No trades executed yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer>
+            <p>🤖 Powered by LangChain RAG | Last updated: <span id="lastUpdate">Never</span></p>
+        </footer>
+    </div>
+
+    <!-- Chat Widget -->
+    <div class="chat-widget" id="chatWidget">
+        <div class="chat-header" onclick="toggleChat()">
+            <span>💬 Portfolio Assistant</span>
+            <span class="chat-toggle">▼</span>
+        </div>
+        <div class="chat-body" id="chatBody">
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    👋 Hi! I'm your AI portfolio assistant. Ask me anything about your trades, positions, or market analysis!
+                </div>
+            </div>
+            <div class="chat-suggestions" id="chatSuggestions"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chatInput" placeholder="Ask about your portfolio..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="chat.js"></script>
+</body>
+</html>

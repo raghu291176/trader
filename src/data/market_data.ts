@@ -3,6 +3,8 @@
  * Links to spec Section 3 (Market Data)
  */
 
+import yahooFinance from 'yahoo-finance2';
+
 export interface PriceData {
   ticker: string;
   date: Date;
@@ -22,11 +24,11 @@ export interface CandleData {
 }
 
 /**
- * Fetch historical price data
- * Using node-fetch + yfinance-like approach
+ * Fetch historical price data from Yahoo Finance
  */
 export class MarketData {
-  private cache: Map<string, CandleData> = new Map();
+  private cache: Map<string, { data: CandleData; timestamp: number }> = new Map();
+  private cacheExpiryMs = 60 * 60 * 1000; // 1 hour
 
   /**
    * Fetch recent price history for a ticker
@@ -40,12 +42,55 @@ export class MarketData {
   ): Promise<CandleData> {
     // Check cache
     const cached = this.cache.get(ticker);
-    if (cached) {
-      return cached;
+    if (cached && Date.now() - cached.timestamp < this.cacheExpiryMs) {
+      return cached.data;
     }
 
-    // Simulate fetching - in production, use yfinance-like API
-    // For now, return mock data for testing
+    try {
+      // Fetch real data from Yahoo Finance
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days - 10); // Extra buffer for weekends
+
+      const result = await yahooFinance.historical(ticker, {
+        period1: startDate,
+        period2: endDate,
+        interval: '1d',
+      });
+
+      const prices: number[] = [];
+      const volumes: number[] = [];
+      const dates: Date[] = [];
+
+      for (const quote of result) {
+        prices.push(quote.close);
+        volumes.push(quote.volume);
+        dates.push(quote.date);
+      }
+
+      const candleData: CandleData = {
+        ticker,
+        prices,
+        volumes,
+        dates,
+      };
+
+      // Cache the result
+      this.cache.set(ticker, { data: candleData, timestamp: Date.now() });
+
+      return candleData;
+    } catch (error) {
+      console.error(`Failed to fetch data for ${ticker}:`, error);
+
+      // Fallback to mock data if Yahoo Finance fails
+      return this.generateMockData(ticker, days);
+    }
+  }
+
+  /**
+   * Generate mock data as fallback
+   */
+  private generateMockData(ticker: string, days: number): CandleData {
     const prices: number[] = [];
     const volumes: number[] = [];
     const dates: Date[] = [];

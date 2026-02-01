@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Rotation Agent - Multi-User Auth</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #5469d4;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #4558c9;
+    }
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .portfolio-card {
+      border: 1px solid #e0e0e0;
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      margin: 10px 0;
+    }
+    .stat-value {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📈 Portfolio Rotation Agent</h1>
+      <div class="user-info" id="userInfo"></div>
+    </div>
+
+    <div id="auth-required" style="display: none;">
+      <div class="portfolio-card">
+        <h2>🔐 Authentication Required</h2>
+        <p>Please sign in to view your portfolio and manage your investments.</p>
+        <button class="btn btn-primary" onclick="signIn()">Sign In</button>
+        <button class="btn btn-secondary" onclick="signUp()">Create Account</button>
+      </div>
+    </div>
+
+    <div id="portfolio-dashboard" style="display: none;">
+      <div class="portfolio-card">
+        <h2>💼 My Portfolio</h2>
+        <div id="portfolio-stats"></div>
+      </div>
+
+      <div class="portfolio-card">
+        <h2>📊 Active Positions</h2>
+        <div id="positions-list"></div>
+      </div>
+
+      <div class="portfolio-card">
+        <h2>📈 Recent Trades</h2>
+        <div id="trades-list"></div>
+      </div>
+
+      <div class="portfolio-card">
+        <h2>⚙️ Actions</h2>
+        <button class="btn btn-primary" onclick="analyzeWatchlist()">Analyze Watchlist</button>
+        <button class="btn btn-primary" onclick="executeRotation()">Execute Rotation</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">
+      <div>Loading...</div>
+    </div>
+  </div>
+
+  <!-- Clerk JavaScript SDK -->
+  <script async crossorigin="anonymous"
+    src="https://key-termite-84.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+    data-clerk-publishable-key="pk_test_a2V5LXRlcm1pdGUtODQuY2xlcmsuYWNjb3VudHMuZGV2JA">
+  </script>
+
+  <script>
+    let clerk;
+    let userToken;
+
+    // Initialize Clerk
+    window.addEventListener('load', async function () {
+      clerk = window.Clerk;
+
+      if (!clerk) {
+        console.error('Clerk not loaded');
+        return;
+      }
+
+      // Load Clerk with your publishable key
+      await clerk.load({
+        publishableKey: 'pk_test_a2V5LXRlcm1pdGUtODQuY2xlcmsuYWNjb3VudHMuZGV2JA'
+      });
+
+      // Check if user is signed in
+      if (clerk.user) {
+        await onUserSignedIn();
+      } else {
+        showAuthRequired();
+      }
+    });
+
+    async function signIn() {
+      await clerk.openSignIn({
+        afterSignInUrl: window.location.href
+      });
+    }
+
+    async function signUp() {
+      await clerk.openSignUp({
+        afterSignUpUrl: window.location.href
+      });
+    }
+
+    async function signOut() {
+      await clerk.signOut();
+      location.reload();
+    }
+
+    async function onUserSignedIn() {
+      const user = clerk.user;
+
+      // Get JWT token for API calls
+      userToken = await clerk.session.getToken();
+
+      // Show user info
+      document.getElementById('userInfo').innerHTML = `
+        <span>Welcome, ${user.firstName || user.emailAddresses[0].emailAddress}</span>
+        <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
+      `;
+
+      // Hide auth screen, show dashboard
+      document.getElementById('auth-required').style.display = 'none';
+      document.getElementById('portfolio-dashboard').style.display = 'block';
+
+      // Load portfolio data
+      await loadPortfolio();
+    }
+
+    function showAuthRequired() {
+      document.getElementById('auth-required').style.display = 'block';
+      document.getElementById('portfolio-dashboard').style.display = 'none';
+    }
+
+    // API Call Helper
+    async function apiCall(endpoint, options = {}) {
+      const response = await fetch(`http://localhost:3000${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      return response.json();
+    }
+
+    // Load Portfolio Data
+    async function loadPortfolio() {
+      try {
+        document.getElementById('loading').style.display = 'block';
+
+        // Fetch portfolio, positions, and trades
+        const [portfolio, positions, trades] = await Promise.all([
+          apiCall('/api/portfolio'),
+          apiCall('/api/positions'),
+          apiCall('/api/trades')
+        ]);
+
+        // Display portfolio stats
+        document.getElementById('portfolio-stats').innerHTML = `
+          <div class="stat">
+            <span>Total Value:</span>
+            <span class="stat-value">$${portfolio.totalValue.toFixed(2)}</span>
+          </div>
+          <div class="stat">
+            <span>Cash:</span>
+            <span class="stat-value">$${portfolio.cash.toFixed(2)}</span>
+          </div>
+          <div class="stat">
+            <span>Unrealized P&L:</span>
+            <span class="stat-value" style="color: ${portfolio.unrealizedPnL >= 0 ? 'green' : 'red'}">
+              $${portfolio.unrealizedPnL.toFixed(2)} (${portfolio.unrealizedPnLPercent.toFixed(2)}%)
+            </span>
+          </div>
+          <div class="stat">
+            <span>Max Drawdown:</span>
+            <span class="stat-value">${portfolio.maxDrawdown.toFixed(2)}%</span>
+          </div>
+          <div class="stat">
+            <span>Positions:</span>
+            <span class="stat-value">${portfolio.positionCount}</span>
+          </div>
+        `;
+
+        // Display positions
+        if (positions.length > 0) {
+          document.getElementById('positions-list').innerHTML = positions.map(pos => `
+            <div class="stat">
+              <span><strong>${pos.ticker}</strong> - ${pos.shares} shares @ $${pos.entryPrice.toFixed(2)}</span>
+              <span style="color: ${pos.unrealizedPnL >= 0 ? 'green' : 'red'}">
+                $${pos.unrealizedPnL.toFixed(2)} (${pos.unrealizedPnLPercent.toFixed(2)}%)
+              </span>
+            </div>
+          `).join('');
+        } else {
+          document.getElementById('positions-list').innerHTML = '<p>No active positions</p>';
+        }
+
+        // Display recent trades
+        const recentTrades = trades.slice(-5);
+        if (recentTrades.length > 0) {
+          document.getElementById('trades-list').innerHTML = recentTrades.map(trade => `
+            <div class="stat">
+              <span>${new Date(trade.timestamp).toLocaleDateString()} - ${trade.type} ${trade.ticker}</span>
+              <span>${trade.shares} shares @ $${trade.price.toFixed(2)}</span>
+            </div>
+          `).join('');
+        } else {
+          document.getElementById('trades-list').innerHTML = '<p>No trades yet</p>';
+        }
+
+        document.getElementById('loading').style.display = 'none';
+      } catch (error) {
+        console.error('Error loading portfolio:', error);
+        alert('Failed to load portfolio: ' + error.message);
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    // Analyze Watchlist
+    async function analyzeWatchlist() {
+      try {
+        document.getElementById('loading').style.display = 'block';
+
+        const result = await apiCall('/api/analyze', {
+          method: 'POST',
+          body: JSON.stringify({
+            watchlist: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA']
+          })
+        });
+
+        alert(`Analysis complete! Top score: ${result.scores[0].ticker} (${result.scores[0].score.toFixed(3)})`);
+
+        document.getElementById('loading').style.display = 'none';
+      } catch (error) {
+        console.error('Error analyzing watchlist:', error);
+        alert('Failed to analyze watchlist: ' + error.message);
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    // Execute Rotation
+    async function executeRotation() {
+      if (!confirm('Are you sure you want to execute rotation? This will place real trades.')) {
+        return;
+      }
+
+      try {
+        document.getElementById('loading').style.display = 'block';
+
+        const result = await apiCall('/api/execute', {
+          method: 'POST'
+        });
+
+        alert(`Rotation complete! Executed ${result.trades.length} trades.`);
+
+        // Reload portfolio
+        await loadPortfolio();
+
+        document.getElementById('loading').style.display = 'none';
+      } catch (error) {
+        console.error('Error executing rotation:', error);
+        alert('Failed to execute rotation: ' + error.message);
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -236,10 +236,81 @@ AC-7: CLI & reproducibility — `analyze`, `trade`, `dashboard` commands run (wi
 
 ---
 
-## 14. Next Steps (I can do now)
+## 14. AI Chatbot for Analysis & Questions
+
+**Inspiration**: https://finelem.app - AI-powered financial analysis assistant
+
+### Chatbot Features
+
+**Core Capabilities:**
+1. **Portfolio Analysis**: Answer questions about current portfolio state, positions, P&L
+2. **Market Insights**: Explain why stocks are scored high/low, catalyst analysis
+3. **Trading Rationale**: Explain rotation decisions, timing factors
+4. **Technical Analysis**: Interpret RSI, MACD, volume signals
+5. **Performance Metrics**: Explain Sharpe ratio, max drawdown, win rate calculations
+6. **Historical Context**: Answer questions about past trades and their outcomes
+
+**Example Queries:**
+- "Why is NVDA scoring higher than AAPL?"
+- "What catalysts triggered the rotation into TSLA?"
+- "Explain my current max drawdown"
+- "Why did we sell MSFT?"
+- "What's the RSI telling us about AMD?"
+- "How can I improve my Sharpe ratio?"
+
+### Implementation
+
+**Tech Stack:**
+- **LLM**: OpenAI GPT-4 (via existing LangChain integration)
+- **Context**: Inject current portfolio state, scores, recent trades into prompts
+- **UI**: Chat widget in bottom-right corner of dashboard
+- **API**: `/api/chat` endpoint for Q&A
+
+**Data Context Provided to LLM:**
+```typescript
+{
+  portfolio: { totalValue, cash, positions, unrealizedPnL },
+  scores: { ticker, score, components, catalysts },
+  recentTrades: [ { type, ticker, price, reason } ],
+  indicators: { rsi, macd, volumeRatio },
+  rotationDecisions: [ { fromTicker, toTicker, scoreDiff } ]
+}
+```
+
+**Response Format:**
+- Conversational, educational tone
+- Cite specific data (e.g., "NVDA scores 0.82 due to 0.65 catalyst strength...")
+- Include relevant metrics/numbers
+- Suggest actionable insights when appropriate
+
+**UI Mockup:**
+```
+[Chat Icon] 💬
+┌────────────────────────────┐
+│ Portfolio Assistant        │
+├────────────────────────────┤
+│ User: Why is NVDA ranked #1?│
+├────────────────────────────┤
+│ AI: NVDA has the highest   │
+│ expected return score of   │
+│ 0.82 because:              │
+│ • Catalyst (0.65): Volume  │
+│   spike detected (3.2x)    │
+│ • Momentum (0.48): RSI...  │
+└────────────────────────────┘
+```
+
+### Acceptance Criteria
+
+AC-8: Chatbot responds with accurate portfolio data within 3 seconds
+AC-9: Chatbot correctly interprets scoring components and provides explanations
+AC-10: Chat history persists during session (localStorage)
+
+---
+
+## 15. Next Steps (I can do now)
 
 1. Convert the Acceptance Criteria into test stubs (unit/integration) and add them to `src/tests/` — confirm and I will create test files.
 2. Wire real market data (`yahoo-finance2`) behind the `MarketData` abstraction and add configuration for API/time-range.
 3. Implement LangChain.js optional reasoning trace enrichment (LLM calls behind a toggle, cached).
-
-If you want, I will now commit this updated PRD into `docs/specs/prd.md` (done), and proceed to create the AC test stubs (option 1), or instead implement the scoreboard tests (option 2). Which should I do next?
+4. Build AI chatbot for portfolio analysis and Q&A (Section 14)
