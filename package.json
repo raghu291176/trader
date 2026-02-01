@@ -1,0 +1,32 @@
+{
+  "name": "portfolio-rotation-agent",
+  "version": "0.1.0",
+  "description": "Return-maximization trading agent with LangChain reasoning traces",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src"
+  },
+  "dependencies": {
+    "yahoo-finance2": "^2.9.0",
+    "langchain": "^0.1.0",
+    "dotenv": "^16.3.1",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.1",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "prettier": "^3.1.0"
+  }
+}

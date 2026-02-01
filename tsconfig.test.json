@@ -1,0 +1,8 @@
+// TypeScript configuration for tests
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+}
