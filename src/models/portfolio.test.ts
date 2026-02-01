@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Portfolio } from '../src/models/portfolio.js';
+import { Portfolio } from './portfolio';
 
 describe('Portfolio', () => {
   it('should initialize with correct capital and cash', () => {

@@ -217,7 +217,7 @@ describe('Indicators Module (AC-1a)', () => {
 
       const ind = calculateIndicators(trendingPrices, volumes);
 
-      expect(ind.macdHistogram).toBeGreaterThanOrEqual(0);
+      expect(ind.histogram).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle small dataset', () => {
@@ -255,9 +255,9 @@ describe('Indicators Module (AC-1a)', () => {
         ...Array.from({ length: 20 }, (_, i) => 100 + i * 2), // Uptrend (positive MACD)
       ];
 
-      const { macdHistogram } = calculateMACD(prices);
+      const { histogram } = calculateMACD(prices);
 
-      expect(macdHistogram).toBeGreaterThanOrEqual(0); // Should be positive in trend
+      expect(histogram).toBeGreaterThanOrEqual(0); // Should be positive in trend
     });
 
     it('AC-1a: Volume surge should be detected when ratio > 1.5', () => {

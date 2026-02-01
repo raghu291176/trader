@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { PositionSizer } from '../src/agent/position_sizer.js';
+import { PositionSizer } from './position_sizer';
 
 describe('PositionSizer', () => {
   const sizer = new PositionSizer();

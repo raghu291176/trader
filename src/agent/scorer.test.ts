@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { Scorer } from '../src/agent/scorer.js';
-import { CandleData } from '../src/data/market_data.js';
-import { CatalystSignals } from '../src/agent/scanner.js';
+import { Scorer } from './scorer';
+import { CandleData } from '../data/market_data';
+import { CatalystSignals } from './scanner';
 
 describe('Scorer', () => {
   const scorer = new Scorer();
