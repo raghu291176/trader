@@ -1,1 +1,26 @@
-node_modules
+
+# Node
+node_modules/
+
+# Build artifacts
+dist/
+
+# Coverage
+coverage/
+coverage/.tmp/
+
+# Environment
+.env
+.env.*
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
