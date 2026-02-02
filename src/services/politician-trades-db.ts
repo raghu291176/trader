@@ -29,7 +29,7 @@ export class PoliticianTradesDatabase {
             AND transaction_date = ${trade.transactionDate.toISOString()}
         `;
 
-        if (existing.length === 0) {
+        if ((existing as any[]).length === 0) {
           await this.sql`
             INSERT INTO trader.politician_trades (
               politician_name, party, chamber, ticker, trade_type,
@@ -76,7 +76,7 @@ export class PoliticianTradesDatabase {
         LIMIT ${limit}
       `;
 
-      return this.mapRowsToTrades(results);
+      return this.mapRowsToTrades(results as any[]);
     } catch (error) {
       console.error(`Failed to get trades for ticker ${ticker}:`, error);
       return [];
@@ -96,7 +96,7 @@ export class PoliticianTradesDatabase {
         LIMIT ${limit}
       `;
 
-      return this.mapRowsToTrades(results);
+      return this.mapRowsToTrades(results as any[]);
     } catch (error) {
       console.error(`Failed to get trades for politician ${name}:`, error);
       return [];
@@ -118,7 +118,7 @@ export class PoliticianTradesDatabase {
         LIMIT ${limit}
       `;
 
-      return this.mapRowsToTrades(results);
+      return this.mapRowsToTrades(results as any[]);
     } catch (error) {
       console.error('Failed to get recent trades:', error);
       return [];
@@ -140,8 +140,8 @@ export class PoliticianTradesDatabase {
         GROUP BY trade_type
       `;
 
-      const buys = results.find(r => r.trade_type === 'BUY')?.count || 0;
-      const sells = results.find(r => r.trade_type === 'SELL')?.count || 0;
+      const buys = (results as any[]).find(r => r.trade_type === 'BUY')?.count || 0;
+      const sells = (results as any[]).find(r => r.trade_type === 'SELL')?.count || 0;
       const total = buys + sells;
 
       if (total === 0) return 0;
@@ -180,7 +180,7 @@ export class PoliticianTradesDatabase {
         LIMIT ${limit}
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         ticker: row.ticker,
         buyCount: row.buy_count,
         sellCount: row.sell_count,

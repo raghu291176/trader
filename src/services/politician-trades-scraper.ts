@@ -114,7 +114,7 @@ export class PoliticianTradesScraper {
       const response = await fetch(this.baseUrls.house);
       const data = await response.json();
 
-      return data.map((trade: any) => this.parseHouseTrade(trade));
+      return (data as any[]).map((trade: any) => this.parseHouseTrade(trade));
     } catch (error) {
       console.error('Failed to scrape House trades:', error);
       return [];
@@ -129,7 +129,7 @@ export class PoliticianTradesScraper {
       const response = await fetch(this.baseUrls.senate);
       const data = await response.json();
 
-      return data.map((trade: any) => this.parseSenatenTrade(trade));
+      return (data as any[]).map((trade: any) => this.parseSenatenTrade(trade));
     } catch (error) {
       console.error('Failed to scrape Senate trades:', error);
       return [];

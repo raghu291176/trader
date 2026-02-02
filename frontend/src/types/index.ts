@@ -52,3 +52,63 @@ export interface Watchlist {
   name: string;
   tickers: string[];
 }
+
+export interface BacktestConfig {
+  startDate: string;
+  endDate: string;
+  initialCapital: number;
+  rebalanceFrequency: 'daily' | 'weekly' | 'monthly';
+  watchlist: string[];
+  maxPositions: number;
+  positionSizePercent: number;
+  stopLossPercent?: number;
+  takeProfitPercent?: number;
+}
+
+export interface BacktestPosition {
+  ticker: string;
+  shares: number;
+  entryPrice: number;
+  entryDate: string;
+  exitPrice?: number;
+  exitDate?: string;
+  exitReason?: 'rebalance' | 'stop_loss' | 'take_profit' | 'end_of_period';
+  pnl?: number;
+  pnlPercent?: number;
+}
+
+export interface BacktestSnapshot {
+  date: string;
+  portfolioValue: number;
+  cash: number;
+  positions: BacktestPosition[];
+  dailyReturn: number;
+  cumulativeReturn: number;
+}
+
+export interface BacktestMetrics {
+  totalReturn: number;
+  totalReturnPercent: number;
+  cagr: number;
+  sharpeRatio: number;
+  sortinoRatio: number;
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  winRate: number;
+  profitFactor: number;
+  avgWin: number;
+  avgLoss: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  volatility: number;
+  calmarRatio: number;
+}
+
+export interface BacktestResult {
+  config: BacktestConfig;
+  snapshots: BacktestSnapshot[];
+  closedPositions: BacktestPosition[];
+  metrics: BacktestMetrics;
+  benchmarkReturns?: { date: string; value: number; return: number }[];
+}

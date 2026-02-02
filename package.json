@@ -16,34 +16,35 @@
     "format": "prettier --write src"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/express": "^1.7.67",
     "@langchain/community": "^1.1.10",
+    "@langchain/core": "^1.1.18",
     "@langchain/openai": "^1.2.4",
     "@neondatabase/serverless": "^1.0.2",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "cheerio": "^1.2.0",
-    "commander": "^11.0.0",
+    "commander": "^14.0.3",
     "cors": "^2.8.6",
-    "dotenv": "^16.3.1",
-    "drizzle-kit": "^0.31.8",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "faiss-node": "^0.5.1",
-    "langchain": "^0.1.0",
+    "langchain": "^1.2.16",
     "openai": "^6.17.0",
     "pgvector": "^0.2.1",
-    "yahoo-finance2": "^2.9.0"
+    "yahoo-finance2": "^3.13.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.10.0",
-    "@typescript-eslint/parser": "^6.10.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "prettier": "^3.1.0",
+    "@types/node": "^25.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "drizzle-kit": "^0.31.8",
+    "prettier": "^3.8.1",
     "ts-node": "^10.9.1",
-    "typescript": "^5.3.3",
-    "vitest": "^1.0.0"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

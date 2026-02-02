@@ -3,22 +3,30 @@
  * Provides REST endpoints for dashboard UI
  */
 
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables FIRST before any other imports
+const envPath = path.join(process.cwd(), '.env');
+dotenv.config({ path: envPath });
+
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
 import { fileURLToPath } from 'url';
 import { UserService } from '../services/user-service.js';
+import { FinnhubService } from '../services/finnhub-service.js';
 import { clerkMiddleware, requireAuth as clerkRequireAuth } from '@clerk/express';
-import dotenv from 'dotenv';
+
+// Initialize Finnhub service
+const finnhubService = new FinnhubService(process.env.FINNHUB_API_KEY!);
 
 // Simple auth helper
 function getUserId(req: any): string {
   return req.auth?.userId || 'anonymous';
 }
 
+// Use Clerk's requireAuth middleware
 const requireAuth = clerkRequireAuth() as any;
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +37,16 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Public endpoints (no authentication required)
+/**
+ * GET /health - Health check endpoint
+ */
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Clerk middleware will automatically use CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY from env
 app.use(clerkMiddleware());
 app.use(express.static(path.join(__dirname, '../../public')));
 
@@ -39,14 +57,7 @@ const userService = new UserService(process.env.DATABASE_URL!);
 // For now, chat service is disabled in multi-user mode
 const chatService = null;
 
-// API Endpoints
-
-/**
- * GET /health - Health check endpoint
- */
-app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
+// Protected API Endpoints (require authentication)
 
 /**
  * GET /api/portfolio - Get current portfolio state (user-specific)
@@ -102,11 +113,11 @@ app.get('/api/scores', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const agent = await userService.getUserAgent(userId);
 
-    // Get user's default watchlist or use default
+    // Get user's default watchlist or use default high-growth stocks
     const watchlists = await userService.getUserWatchlists(userId);
     const defaultWatchlist = watchlists.find(w => w.name === 'default');
     const watchlist = defaultWatchlist?.tickers ||
-      ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD', 'INTC', 'CRM'];
+      ['NVDA', 'AMD', 'SMCI', 'PLTR', 'COIN', 'MSTR', 'SNOW', 'NET', 'DDOG', 'CRWD'];
 
     const result = await agent.analyzeWatchlist(watchlist);
 
@@ -167,11 +178,11 @@ app.post('/api/execute', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const agent = await userService.getUserAgent(userId);
 
-    // Get user's default watchlist
+    // Get user's default watchlist or use high-growth stocks
     const watchlists = await userService.getUserWatchlists(userId);
     const defaultWatchlist = watchlists.find(w => w.name === 'default');
     const watchlist = defaultWatchlist?.tickers ||
-      ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD', 'INTC', 'CRM'];
+      ['NVDA', 'AMD', 'SMCI', 'PLTR', 'COIN', 'MSTR', 'SNOW', 'NET', 'DDOG', 'CRWD'];
 
     await agent.runTradingPass(watchlist);
 
@@ -266,6 +277,176 @@ app.post('/api/user/watchlists', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/market/:ticker - Get comprehensive market data for a ticker
+ */
+app.get('/api/market/:ticker', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const analysis = await finnhubService.getTickerAnalysis(ticker.toUpperCase());
+
+    res.json(analysis);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/recommendations - Get analyst recommendations
+ */
+app.get('/api/market/:ticker/recommendations', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const recommendations = await finnhubService.getRecommendations(ticker.toUpperCase());
+
+    res.json(recommendations);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/price-target - Get analyst price target
+ */
+app.get('/api/market/:ticker/price-target', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const priceTarget = await finnhubService.getPriceTarget(ticker.toUpperCase());
+
+    res.json(priceTarget);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/news - Get company news
+ */
+app.get('/api/market/:ticker/news', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const news = await finnhubService.getNews(ticker.toUpperCase());
+
+    res.json(news);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/earnings - Get earnings data
+ */
+app.get('/api/market/:ticker/earnings', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const earnings = await finnhubService.getEarningsSurprises(ticker.toUpperCase());
+
+    res.json(earnings);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/politician-trades - Get politician trades for ticker
+ */
+app.get('/api/market/:ticker/politician-trades', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const { PoliticianTradesDatabase } = await import('../services/politician-trades-db.js');
+    const tradesDb = new PoliticianTradesDatabase(process.env.DATABASE_URL!);
+
+    const trades = await tradesDb.getTradesForTicker(ticker.toUpperCase(), 10);
+    res.json(trades);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/indicators - Get technical indicators
+ */
+app.get('/api/market/:ticker/indicators', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const { MarketData } = await import('../data/market_data.js');
+    const { TechnicalIndicatorsService } = await import('../services/technical-indicators.js');
+
+    const marketData = new MarketData();
+    const indicatorsService = new TechnicalIndicatorsService();
+
+    // Get 100 days of historical data for indicator calculation
+    const candleData = await marketData.fetchCandles(ticker.toUpperCase(), 100);
+
+    // Transform to price data format
+    const priceData = candleData.dates.map((date, i) => ({
+      timestamp: date.getTime(),
+      open: candleData.prices[i],
+      high: candleData.prices[i],
+      low: candleData.prices[i],
+      close: candleData.prices[i],
+      volume: candleData.volumes[i]
+    }));
+
+    const indicators = indicatorsService.calculateAllIndicators(priceData);
+    res.json(indicators);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/chart - Get historical price data
+ */
+app.get('/api/market/:ticker/chart', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+    const { timeframe = '1M' } = req.query;
+
+    // Import market data service
+    const { MarketData } = await import('../data/market_data.js');
+    const marketData = new MarketData();
+
+    // Calculate days based on timeframe
+    let days: number;
+    switch (timeframe) {
+      case '1D': // Intraday (Note: yahoo-finance2 doesn't support intraday, using 5 days)
+        days = 5;
+        break;
+      case '1W': // 1 week
+        days = 7;
+        break;
+      case '1M': // 1 month
+        days = 30;
+        break;
+      case '3M': // 3 months
+        days = 90;
+        break;
+      case '1Y': // 1 year
+        days = 365;
+        break;
+      default:
+        days = 30;
+    }
+
+    const candleData = await marketData.fetchCandles(ticker.toUpperCase(), days);
+
+    // Transform CandleData to array of candle objects for chart
+    const candles = candleData.dates.map((date, i) => ({
+      timestamp: date.getTime(),
+      open: candleData.prices[i],
+      high: candleData.prices[i],
+      low: candleData.prices[i],
+      close: candleData.prices[i],
+      volume: candleData.volumes[i]
+    }));
+
+    res.json(candles);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
  * POST /api/chat - Ask questions about portfolio with RAG
  */
 app.post('/api/chat', async (req, res) => {
@@ -317,16 +498,88 @@ app.get('/api/chat/suggestions', (req, res) => {
   }
 });
 
+/**
+ * POST /api/backtest - Run backtest simulation
+ */
+app.post('/api/backtest', requireAuth, async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      initialCapital = 10000,
+      rebalanceFrequency = 'weekly',
+      watchlist,
+      maxPositions = 5,
+      positionSizePercent = 20,
+      stopLossPercent,
+      takeProfitPercent,
+    } = req.body;
+
+    if (!startDate || !endDate || !watchlist || !Array.isArray(watchlist)) {
+      return res.status(400).json({
+        error: 'Missing required fields: startDate, endDate, watchlist',
+      });
+    }
+
+    const { BacktestingService } = await import('../services/backtesting-service.js');
+    const backtestingService = new BacktestingService();
+
+    const result = await backtestingService.runBacktest({
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      initialCapital,
+      rebalanceFrequency,
+      watchlist,
+      maxPositions,
+      positionSizePercent,
+      stopLossPercent,
+      takeProfitPercent,
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Backtest error:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/backtest/compare - Compare multiple backtest strategies
+ */
+app.post('/api/backtest/compare', requireAuth, async (req, res) => {
+  try {
+    const { configs } = req.body;
+
+    if (!configs || !Array.isArray(configs) || configs.length === 0) {
+      return res.status(400).json({
+        error: 'configs array is required',
+      });
+    }
+
+    const { BacktestingService } = await import('../services/backtesting-service.js');
+    const backtestingService = new BacktestingService();
+
+    const parsedConfigs = configs.map((config: any) => ({
+      ...config,
+      startDate: new Date(config.startDate),
+      endDate: new Date(config.endDate),
+    }));
+
+    const results = await backtestingService.compareStrategies(parsedConfigs);
+
+    res.json(results);
+  } catch (error) {
+    console.error('Backtest compare error:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Portfolio Rotation Agent API - Multi-User Edition`);
-  console.log(`📊 Dashboard: http://localhost:${PORT}`);
-  console.log(`🔌 API Endpoint: http://localhost:${PORT}/api`);
-  console.log(`🔐 Authentication: Clerk (Multi-User Support)`);
-  console.log(`💾 Database: Neon PostgreSQL with pgvector`);
-  console.log(`💬 Chat with RAG: ${chatService ? 'Enabled' : 'Coming soon (per-user instances)'}`);
-  console.log(`\n👨‍👩‍👧‍👦 Each user gets their own portfolio`);
-  console.log(`📈 Ready for your family to trade!\n`);
+  console.log(`\nPortfolio Management System`);
+  console.log(`Server: http://localhost:${PORT}`);
+  console.log(`Status: Running`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}\n`);
 });
 
 export default app;

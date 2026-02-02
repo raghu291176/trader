@@ -1,0 +1,120 @@
+/* Header & Navigation */
+
+header {
+  background: var(--bg-dark);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-dark);
+  flex-shrink: 0;
+  z-index: 20;
+  gap: 2rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+header h1 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.logo-icon {
+  width: 2rem;
+  height: 2rem;
+  background: rgba(15, 122, 230, 0.2);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.header-nav {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.header-nav a {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.header-nav a:hover {
+  color: var(--text-primary);
+  background: var(--surface-darker);
+}
+
+.header-nav a.active {
+  color: var(--text-primary);
+  background: var(--surface-dark);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-darker);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-dark);
+  min-width: 200px;
+}
+
+.search-box input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.search-box input::placeholder {
+  color: var(--text-secondary);
+}
+
+.search-box .material-symbols-outlined {
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: var(--surface-darker);
+  color: var(--text-primary);
+}
+
+.icon-btn .material-symbols-outlined {
+  font-size: 1.25rem;
+}

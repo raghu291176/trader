@@ -98,6 +98,62 @@ class ApiService {
   async saveWatchlist(name: string, tickers: string[]): Promise<void> {
     await this.client.post('/user/watchlists', { name, tickers });
   }
+
+  /**
+   * Market data endpoints
+   */
+  async getTickerAnalysis(ticker: string): Promise<any> {
+    const { data } = await this.client.get(`/market/${ticker}`);
+    return data;
+  }
+
+  async getRecommendations(ticker: string): Promise<any[]> {
+    const { data } = await this.client.get(`/market/${ticker}/recommendations`);
+    return data;
+  }
+
+  async getPriceTarget(ticker: string): Promise<any> {
+    const { data } = await this.client.get(`/market/${ticker}/price-target`);
+    return data;
+  }
+
+  async getNews(ticker: string): Promise<any[]> {
+    const { data } = await this.client.get(`/market/${ticker}/news`);
+    return data;
+  }
+
+  async getEarnings(ticker: string): Promise<any[]> {
+    const { data } = await this.client.get(`/market/${ticker}/earnings`);
+    return data;
+  }
+
+  async getChartData(ticker: string, timeframe: string): Promise<any[]> {
+    const { data } = await this.client.get(`/market/${ticker}/chart?timeframe=${timeframe}`);
+    return data;
+  }
+
+  async getPoliticianTrades(ticker: string): Promise<any[]> {
+    const { data } = await this.client.get(`/market/${ticker}/politician-trades`);
+    return data;
+  }
+
+  async getTechnicalIndicators(ticker: string): Promise<any> {
+    const { data } = await this.client.get(`/market/${ticker}/indicators`);
+    return data;
+  }
+
+  /**
+   * Backtesting endpoints
+   */
+  async runBacktest(config: any): Promise<any> {
+    const { data } = await this.client.post('/backtest', config);
+    return data;
+  }
+
+  async compareBacktests(configs: any[]): Promise<any[]> {
+    const { data } = await this.client.post('/backtest/compare', { configs });
+    return data;
+  }
 }
 
 export const apiService = new ApiService();

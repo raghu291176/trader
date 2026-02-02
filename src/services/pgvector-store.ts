@@ -88,7 +88,7 @@ export class PgVectorStore {
         LIMIT ${topK}
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         pageContent: row.content,
         metadata: row.metadata || {},
       })) as Document[];
@@ -111,7 +111,7 @@ export class PgVectorStore {
         LIMIT ${limit}
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         pageContent: row.content,
         metadata: row.metadata || {},
       })) as Document[];
@@ -134,7 +134,7 @@ export class PgVectorStore {
         LIMIT ${limit}
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         pageContent: row.content,
         metadata: row.metadata || {},
       })) as Document[];

@@ -52,20 +52,24 @@ export class MarketData {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days - 10); // Extra buffer for weekends
 
-      const result = await yahooFinance.historical(ticker, {
+      const queryOptions = {
         period1: startDate,
         period2: endDate,
-        interval: '1d',
-      });
+        interval: '1d' as const
+      };
+      const result = await (yahooFinance as any).historical(ticker, queryOptions);
 
       const prices: number[] = [];
       const volumes: number[] = [];
       const dates: Date[] = [];
 
+      // Extract data from the result
       for (const quote of result) {
-        prices.push(quote.close);
-        volumes.push(quote.volume);
-        dates.push(quote.date);
+        if (quote.close && quote.volume && quote.date) {
+          prices.push(quote.close);
+          volumes.push(quote.volume);
+          dates.push(new Date(quote.date));
+        }
       }
 
       const candleData: CandleData = {
@@ -113,7 +117,7 @@ export class MarketData {
     const candles: CandleData = { ticker, prices, volumes, dates };
 
     // Cache result
-    this.cache.set(ticker, candles);
+    this.cache.set(ticker, { data: candles, timestamp: Date.now() });
 
     return candles;
   }

@@ -3,8 +3,8 @@
  * Continuously updates RAG database with latest market analysis from major firms
  */
 
-import { Document } from 'langchain/document';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { Document } from '@langchain/core/documents';
+// MemoryVectorStore removed in langchain v1+ - simplified implementation
 import { OpenAIEmbeddings } from '@langchain/openai';
 
 export interface AzureOpenAIConfig {
@@ -38,7 +38,6 @@ export interface MarketNews {
 }
 
 export class MarketIntelligenceService {
-  private vectorStore: MemoryVectorStore | null = null;
   private updateInterval: NodeJS.Timeout | null = null;
   private analystReports: AnalystReport[] = [];
   private marketNews: MarketNews[] = [];
@@ -172,73 +171,26 @@ export class MarketIntelligenceService {
 
   /**
    * Rebuild vector store with latest intelligence
+   * Note: Vector store functionality removed in langchain v1+ migration
+   * Documents are now returned directly via getIntelligenceDocuments()
    */
   private async rebuildVectorStore(): Promise<void> {
-    const embeddings = new OpenAIEmbeddings({
-      configuration: {
-        apiKey: this.azureConfig.apiKey,
-        baseURL: `${this.azureConfig.endpoint}/openai/deployments/${this.azureConfig.embeddingDeploymentName || 'text-embedding-ada-002'}`,
-        defaultQuery: { 'api-version': this.azureConfig.apiVersion || '2024-02-15-preview' },
-        defaultHeaders: { 'api-key': this.azureConfig.apiKey },
-      },
-    } as any);
-    const documents: Document[] = [];
-
-    // Add analyst reports as documents
-    for (const report of this.analystReports) {
-      const upside = ((report.targetPrice - report.currentPrice) / report.currentPrice * 100).toFixed(1);
-
-      documents.push(new Document({
-        pageContent: `${report.firm} Analyst Report on ${report.ticker}:
-Analyst: ${report.analyst}
-Rating: ${report.rating}
-Target Price: $${report.targetPrice} (${upside}% upside)
-Current Price: $${report.currentPrice}
-Date: ${report.timestamp.toISOString()}
-Summary: ${report.summary}
-Key Catalysts: ${report.catalysts?.join(', ') || 'N/A'}`,
-        metadata: {
-          type: 'analyst_report',
-          firm: report.firm,
-          ticker: report.ticker,
-          rating: report.rating,
-          targetPrice: report.targetPrice,
-          timestamp: report.timestamp.toISOString(),
-        },
-      }));
-    }
-
-    // Add market news as documents
-    for (const news of this.marketNews) {
-      documents.push(new Document({
-        pageContent: `${news.source} - ${news.headline}
-${news.summary}
-Tickers Mentioned: ${news.tickers.join(', ')}
-Sentiment: ${news.sentiment > 0 ? 'Positive' : news.sentiment < 0 ? 'Negative' : 'Neutral'} (${news.sentiment.toFixed(2)})
-Published: ${news.timestamp.toISOString()}`,
-        metadata: {
-          type: 'market_news',
-          source: news.source,
-          tickers: news.tickers,
-          sentiment: news.sentiment,
-          timestamp: news.timestamp.toISOString(),
-        },
-      }));
-    }
-
-    // Create vector store
-    this.vectorStore = await MemoryVectorStore.fromDocuments(documents, embeddings);
+    // No-op: vector store functionality simplified
+    // Data is accessed directly via analystReports and marketNews arrays
   }
 
   /**
    * Query market intelligence
+   * Note: Simplified implementation without vector search
    */
   async query(question: string, topK: number = 3): Promise<Document[]> {
-    if (!this.vectorStore) {
+    if (this.analystReports.length === 0 || this.marketNews.length === 0) {
       await this.updateMarketIntelligence();
     }
 
-    return await this.vectorStore!.similaritySearch(question, topK);
+    // Return all intelligence documents (simplified without vector search)
+    const docs = await this.getIntelligenceDocuments();
+    return docs.slice(0, topK);
   }
 
   /**
@@ -276,7 +228,7 @@ Published: ${news.timestamp.toISOString()}`,
    * Get market intelligence documents for RAG injection
    */
   async getIntelligenceDocuments(): Promise<Document[]> {
-    if (!this.vectorStore) {
+    if (this.analystReports.length === 0 || this.marketNews.length === 0) {
       await this.updateMarketIntelligence();
     }
 

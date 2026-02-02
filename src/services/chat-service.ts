@@ -4,8 +4,7 @@
  */
 
 import { AzureChatOpenAI } from '@langchain/openai';
-import { Document } from 'langchain/document';
-import { RetrievalQAChain } from 'langchain/chains';
+import { Document } from '@langchain/core/documents';
 import { PromptTemplate } from '@langchain/core/prompts';
 import { PortfolioRotationAgent } from '../agent/portfolio_rotation.js';
 import { MarketIntelligenceService } from './market-intelligence.js';
@@ -23,7 +22,6 @@ export interface AzureOpenAIConfig {
 export class ChatService {
   private llm: AzureChatOpenAI;
   private vectorStore: PgVectorStore;
-  private qaChain: RetrievalQAChain | null = null;
   private agent: PortfolioRotationAgent;
   private marketIntel: MarketIntelligenceService;
   private azureConfig: AzureOpenAIConfig;
@@ -181,7 +179,8 @@ Components:
    * Answer a user question using RAG
    */
   async ask(question: string): Promise<{ answer: string; sources: string[] }> {
-    if (!this.qaChain) {
+    // Ensure vector store is initialized
+    if (await this.vectorStore.getCount() === 0) {
       await this.initialize();
     }
 

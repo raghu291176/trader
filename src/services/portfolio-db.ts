@@ -4,7 +4,9 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import type { Portfolio, Position, Trade } from '../agent/portfolio.js';
+import type { Portfolio } from '../models/portfolio.js';
+import type { Position } from '../models/position.js';
+import type { Trade } from '../models/trade.js';
 
 export class PortfolioDatabase {
   private sql: ReturnType<typeof neon>;
@@ -23,7 +25,7 @@ export class PortfolioDatabase {
         SELECT id FROM trader.portfolios WHERE user_id = ${userId}
       `;
 
-      if (existing.length > 0) {
+      if ((existing as any[]).length > 0) {
         // Update existing portfolio
         await this.sql`
           UPDATE trader.portfolios
@@ -34,7 +36,7 @@ export class PortfolioDatabase {
             updated_at = NOW()
           WHERE user_id = ${userId}
         `;
-        return existing[0].id;
+        return (existing as any[])[0].id;
       } else {
         // Insert new portfolio
         const result = await this.sql`
@@ -42,7 +44,7 @@ export class PortfolioDatabase {
           VALUES (${userId}, ${portfolio['initialCapital']}, ${portfolio.getTotalValue()}, ${portfolio.getCash()}, ${portfolio['peakValue']})
           RETURNING id
         `;
-        return result[0].id;
+        return (result as any[])[0].id;
       }
     } catch (error) {
       console.error('Failed to save portfolio:', error);
@@ -67,14 +69,15 @@ export class PortfolioDatabase {
         WHERE user_id = ${userId}
       `;
 
-      if (result.length === 0) return null;
+      if ((result as any[]).length === 0) return null;
 
+      const row = (result as any[])[0];
       return {
-        id: result[0].id,
-        initialCapital: result[0].initial_capital,
-        currentValue: result[0].current_value,
-        cash: result[0].cash,
-        peakValue: result[0].peak_value,
+        id: row.id,
+        initialCapital: row.initial_capital,
+        currentValue: row.current_value,
+        cash: row.cash,
+        peakValue: row.peak_value,
       };
     } catch (error) {
       console.error('Failed to load portfolio:', error);
@@ -126,7 +129,7 @@ export class PortfolioDatabase {
         ORDER BY entry_timestamp DESC
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         ticker: row.ticker,
         shares: row.shares,
         entryPrice: row.entry_price,
@@ -188,7 +191,7 @@ export class PortfolioDatabase {
         LIMIT ${limit}
       `;
 
-      return results.map(row => ({
+      return (results as any[]).map(row => ({
         ticker: row.ticker,
         type: row.trade_type,
         shares: row.shares,
