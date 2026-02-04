@@ -1,5 +1,5 @@
 /**
- * API Service - Handles all backend communication with authentication
+ * API Service - Handles all backend communication
  */
 
 import axios, { AxiosInstance } from 'axios';
@@ -7,7 +7,6 @@ import type { Portfolio, Position, Trade, Score, UserProfile, Watchlist } from '
 
 class ApiService {
   private client: AxiosInstance;
-  private getToken?: () => Promise<string | null>;
 
   constructor() {
     this.client = axios.create({
@@ -16,24 +15,6 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     });
-
-    // Request interceptor to add auth token
-    this.client.interceptors.request.use(async (config) => {
-      if (this.getToken) {
-        const token = await this.getToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      }
-      return config;
-    });
-  }
-
-  /**
-   * Set function to retrieve Clerk auth token
-   */
-  setTokenGetter(getToken: () => Promise<string | null>) {
-    this.getToken = getToken;
   }
 
   /**

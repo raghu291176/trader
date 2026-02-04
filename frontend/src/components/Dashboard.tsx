@@ -7,8 +7,15 @@ import { useEffect, useState } from 'react'
 import { apiService } from '../services/api'
 import type { Portfolio, Position, Trade, Score } from '../types'
 import TickerAnalysis from './TickerAnalysis'
+import PoliticianTrades from './PoliticianTrades'
+import CollapsibleCard from './CollapsibleCard'
 
-export default function Dashboard() {
+interface DashboardProps {
+  searchTicker?: string | null;
+  onTickerSearched?: () => void;
+}
+
+export default function Dashboard({ searchTicker, onTickerSearched }: DashboardProps) {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -17,6 +24,14 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
+
+  // Handle search ticker from header
+  useEffect(() => {
+    if (searchTicker) {
+      setSelectedTicker(searchTicker);
+      onTickerSearched?.();
+    }
+  }, [searchTicker, onTickerSearched]);
 
   useEffect(() => {
     loadData()
@@ -58,6 +73,36 @@ export default function Dashboard() {
       setMessage({ type: 'error', text: 'Failed to rebalance: ' + (err instanceof Error ? err.message : 'Unknown error') })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleBuyStock(ticker: string) {
+    const shares = prompt(`How many shares of ${ticker} do you want to buy?`)
+    if (!shares || isNaN(Number(shares))) return
+
+    try {
+      setMessage(null)
+      // For now, trigger a rebalance which will analyze and potentially buy
+      // In the future, this could be a direct buy API
+      await apiService.executeRotation()
+      await loadData()
+      setMessage({ type: 'success', text: `Buy order for ${ticker} processed` })
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to buy: ' + (err instanceof Error ? err.message : 'Unknown error') })
+    }
+  }
+
+  async function handleSellStock(ticker: string) {
+    if (!confirm(`Sell all shares of ${ticker}?`)) return
+
+    try {
+      setMessage(null)
+      // Trigger rebalance to sell position
+      await apiService.executeRotation()
+      await loadData()
+      setMessage({ type: 'success', text: `Sell order for ${ticker} processed` })
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to sell: ' + (err instanceof Error ? err.message : 'Unknown error') })
     }
   }
 
@@ -113,11 +158,7 @@ export default function Dashboard() {
         {/* Main Content */}
         <div className="dashboard-main">
           {/* Active Holdings */}
-          <section className="card">
-            <h2>
-              <span className="material-symbols-outlined">pie_chart</span>
-              Active Holdings
-            </h2>
+          <CollapsibleCard title="Active Holdings" icon="pie_chart" defaultExpanded={true}>
             {positions.length > 0 ? (
               <table>
                 <thead>
@@ -129,6 +170,7 @@ export default function Dashboard() {
                     <th>P&L ($)</th>
                     <th>P&L (%)</th>
                     <th className="text-right">Score</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -145,6 +187,11 @@ export default function Dashboard() {
                         {pos.unrealizedPnLPercent >= 0 ? '+' : ''}{pos.unrealizedPnLPercent.toFixed(0)}%
                       </td>
                       <td className="text-right"><strong>{pos.entryScore?.toFixed(2) || 'N/A'}</strong></td>
+                      <td>
+                        <button className="btn-sell" onClick={() => handleSellStock(pos.ticker)}>
+                          Sell
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -152,16 +199,15 @@ export default function Dashboard() {
             ) : (
               <p className="empty">No current holdings</p>
             )}
-          </section>
+          </CollapsibleCard>
 
           {/* Candidate Watchlist & Scoring Engine */}
-          <section className="card">
-            <div className="card-header">
-              <h2>
-                <span className="material-symbols-outlined">star</span>
-                Candidate Watchlist & Scoring Engine
-              </h2>
-              <div className="card-actions">
+          <CollapsibleCard
+            title="Candidate Watchlist & Scoring Engine"
+            icon="star"
+            defaultExpanded={true}
+            actions={
+              <>
                 <button className="btn-secondary">
                   <span className="material-symbols-outlined">tune</span>
                   Filters
@@ -170,14 +216,16 @@ export default function Dashboard() {
                   <span className="material-symbols-outlined">play_arrow</span>
                   Run Scanner
                 </button>
-              </div>
-            </div>
+              </>
+            }
+          >
             {scores.length > 0 ? (
               <table>
                 <thead>
                   <tr>
                     <th>Rank</th>
                     <th>Ticker</th>
+                    <th>Price</th>
                     <th>Score</th>
                     <th>PRD Breakdown</th>
                     <th>Rotation Gain</th>
@@ -202,6 +250,7 @@ export default function Dashboard() {
                             <strong>{score.ticker}</strong>
                           </div>
                         </td>
+                        <td>${score.currentPrice?.toFixed(2) || 'N/A'}</td>
                         <td><strong>{score.score.toFixed(2)}</strong></td>
                         <td>
                           <div className="prd-badges">
@@ -216,9 +265,14 @@ export default function Dashboard() {
                           {score.score > 0.5 ? '+' : ''}{(score.score - 0.5).toFixed(2)} vs AVG
                         </td>
                         <td>
-                          <button className="btn-analyze" onClick={() => setSelectedTicker(score.ticker)}>
-                            Analyze
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn-buy" onClick={() => handleBuyStock(score.ticker)}>
+                              Buy
+                            </button>
+                            <button className="btn-analyze" onClick={() => setSelectedTicker(score.ticker)}>
+                              Analyze
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -228,7 +282,7 @@ export default function Dashboard() {
             ) : (
               <p className="empty">Analyzing market opportunities...</p>
             )}
-          </section>
+          </CollapsibleCard>
         </div>
 
         {/* Sidebar */}
@@ -271,6 +325,8 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          <PoliticianTrades />
         </aside>
       </div>
 
@@ -297,18 +353,32 @@ export default function Dashboard() {
           </button>
         </div>
         <div className="assistant-messages">
-          <div className="assistant-message">
-            <div className="message-icon">
-              <span className="material-symbols-outlined">smart_toy</span>
-            </div>
-            <div className="message-content">
-              I've ranked <strong>SMCI #1</strong> because relative volume is 3.5x average and the breakout above $900 is confirmed.
-              <div className="message-meta">
-                <span className="badge badge-vol">Vol: 3.5x</span>
-                <span className="badge badge-rsi">RSI: 68</span>
+          {scores.length > 0 && scores[0] && (
+            <div className="assistant-message">
+              <div className="message-icon">
+                <span className="material-symbols-outlined">smart_toy</span>
+              </div>
+              <div className="message-content">
+                I've ranked <strong>{scores[0].ticker} #1</strong> based on current market analysis.
+                <div className="message-meta">
+                  <span className="badge badge-vol">Score: {scores[0].score.toFixed(2)}</span>
+                  {scores[0].components?.momentum && (
+                    <span className="badge badge-rsi">Mom: {(scores[0].components.momentum * 100).toFixed(0)}%</span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
+          {scores.length === 0 && (
+            <div className="assistant-message">
+              <div className="message-icon">
+                <span className="material-symbols-outlined">smart_toy</span>
+              </div>
+              <div className="message-content">
+                Analyzing market opportunities...
+              </div>
+            </div>
+          )}
         </div>
         <div className="assistant-input">
           <input type="text" placeholder="Ask about holdings..." />

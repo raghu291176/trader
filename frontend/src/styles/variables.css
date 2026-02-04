@@ -1,14 +1,14 @@
-/* CSS Custom Properties */
+/* CSS Custom Properties - Light Theme */
 :root {
-  --primary: #0f7ae6;
-  --bg-dark: #111a22;
-  --surface-dark: #192634;
-  --surface-darker: #151f2b;
-  --border-dark: #233648;
-  --text-primary: #ffffff;
-  --text-secondary: #91adca;
-  --text-muted: #d1dce5;
-  --emerald: #10b981;
-  --rose: #f43f5e;
-  --yellow: #eab308;
+  --primary: #00c805;
+  --bg-dark: #ffffff;
+  --surface-dark: #f8f9fa;
+  --surface-darker: #ffffff;
+  --border-dark: #e5e7eb;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6c757d;
+  --text-muted: #495057;
+  --emerald: #00c805;
+  --rose: #ff5000;
+  --yellow: #f59e0b;
 }

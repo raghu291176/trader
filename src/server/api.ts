@@ -113,19 +113,39 @@ app.get('/api/scores', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const agent = await userService.getUserAgent(userId);
 
-    // Get user's default watchlist or use default high-growth stocks
+    // Build comprehensive ticker list: Top 25 + Watchlist + Owned
+    const top25 = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX',
+      'BRK.B', 'V', 'JNJ', 'WMT', 'JPM', 'MA', 'PG',
+      'UNH', 'HD', 'DIS', 'BAC', 'ADBE', 'CRM', 'NFLX',
+      'CSCO', 'PEP', 'TMO'
+    ];
+
+    // Get user's custom watchlist
     const watchlists = await userService.getUserWatchlists(userId);
     const defaultWatchlist = watchlists.find(w => w.name === 'default');
-    const watchlist = defaultWatchlist?.tickers ||
-      ['NVDA', 'AMD', 'SMCI', 'PLTR', 'COIN', 'MSTR', 'SNOW', 'NET', 'DDOG', 'CRWD'];
+    const watchlistTickers = defaultWatchlist?.tickers || [];
 
-    const result = await agent.analyzeWatchlist(watchlist);
+    // Get currently owned positions
+    const currentPositions = agent.getPositions();
+    const ownedTickers = currentPositions.map((p: any) => p.ticker);
 
-    const scores = Array.from(result.scores.entries()).map(([ticker, score]) => ({
-      ticker,
-      score: typeof score === 'number' ? score : (score as any).expectedReturn,
-      components: typeof score === 'number' ? {} : (score as any).components,
-    })).sort((a, b) => b.score - a.score);
+    // Combine all tickers and remove duplicates
+    const allTickers = [...new Set([...top25, ...watchlistTickers, ...ownedTickers])];
+
+    const result = await agent.analyzeWatchlist(allTickers);
+
+    // Get current prices from positions
+    const priceMap = new Map(currentPositions.map((p: any) => [p.ticker, p.currentPrice]));
+
+    const scores = Array.from(result.scores.entries()).map(([ticker, score]) => {
+      return {
+        ticker,
+        score: typeof score === 'number' ? score : (score as any).expectedReturn,
+        components: typeof score === 'number' ? {} : (score as any).components,
+        currentPrice: priceMap.get(ticker) || 0,
+      };
+    }).sort((a, b) => b.score - a.score);
 
     res.json(scores);
   } catch (error) {
@@ -155,6 +175,7 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const agent = await userService.getUserAgent(userId);
     const { watchlist } = req.body;
+
     const result = await agent.analyzeWatchlist(watchlist || ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA']);
 
     res.json({
@@ -178,13 +199,24 @@ app.post('/api/execute', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const agent = await userService.getUserAgent(userId);
 
-    // Get user's default watchlist or use high-growth stocks
+    // Build comprehensive ticker list: Top 25 + Watchlist + Owned
+    const top25 = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX',
+      'BRK.B', 'V', 'JNJ', 'WMT', 'JPM', 'MA', 'PG',
+      'UNH', 'HD', 'DIS', 'BAC', 'ADBE', 'CRM', 'NFLX',
+      'CSCO', 'PEP', 'TMO'
+    ];
+
     const watchlists = await userService.getUserWatchlists(userId);
     const defaultWatchlist = watchlists.find(w => w.name === 'default');
-    const watchlist = defaultWatchlist?.tickers ||
-      ['NVDA', 'AMD', 'SMCI', 'PLTR', 'COIN', 'MSTR', 'SNOW', 'NET', 'DDOG', 'CRWD'];
+    const watchlistTickers = defaultWatchlist?.tickers || [];
 
-    await agent.runTradingPass(watchlist);
+    const positions = agent.getPositions();
+    const ownedTickers = positions.map((p: any) => p.ticker);
+
+    const allTickers = [...new Set([...top25, ...watchlistTickers, ...ownedTickers])];
+
+    await agent.runTradingPass(allTickers);
 
     const output = agent.getAgentOutput();
     res.json({

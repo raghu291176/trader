@@ -67,7 +67,41 @@
 }
 
 .btn-analyze:hover {
-  background: #0d6bc7;
+  background: #00a804;
+}
+
+.btn-buy {
+  background: var(--emerald);
+  color: white;
+  border: none;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.btn-buy:hover {
+  background: #00a804;
+  transform: translateY(-1px);
+}
+
+.btn-sell {
+  background: var(--rose);
+  color: white;
+  border: none;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.btn-sell:hover {
+  background: #e64500;
+  transform: translateY(-1px);
 }
 
 /* Cards */

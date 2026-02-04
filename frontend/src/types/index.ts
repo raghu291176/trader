@@ -37,6 +37,9 @@ export interface Score {
   ticker: string;
   score: number;
   components: Record<string, number>;
+  currentPrice?: number;
+  priceChange?: number;
+  priceChangePercent?: number;
 }
 
 export interface UserProfile {
