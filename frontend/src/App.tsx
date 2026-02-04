@@ -1,9 +1,10 @@
 /**
  * Main App Component
- * Handles routing and navigation
+ * Handles authentication, routing and navigation
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { apiService } from './services/api'
 import Dashboard from './components/Dashboard'
 import { BacktestForm } from './components/BacktestForm'
@@ -15,10 +16,18 @@ import './App.css'
 type TabType = 'dashboard' | 'backtest' | 'settings';
 
 function App() {
+  const { getToken } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('dashboard')
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Set token getter for API service
+    apiService.setTokenGetter(async () => {
+      return await getToken()
+    })
+  }, [getToken])
 
   const handleBacktestResults = (result: BacktestResult) => {
     setBacktestResult(result)
@@ -72,31 +81,46 @@ function App() {
               }}
             />
           </div>
-          <button className="icon-btn">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
+          <SignedIn>
+            <button className="icon-btn">
+              <span className="material-symbols-outlined">notifications</span>
+            </button>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </header>
 
       <main>
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            searchTicker={selectedTicker}
-            onTickerSearched={() => setSelectedTicker(null)}
-          />
-        )}
-        {activeTab === 'backtest' && (
-          <div className="backtest-tab">
-            <BacktestForm onResults={handleBacktestResults} />
-            {backtestResult && <BacktestResults result={backtestResult} />}
+        <SignedOut>
+          <div className="welcome">
+            <h2>Welcome to Portfolio Rotation Agent</h2>
+            <p>Professional investment portfolio management with AI-powered stock analysis</p>
+            <SignInButton mode="modal">
+              <button className="btn-primary">Sign In to Get Started</button>
+            </SignInButton>
           </div>
-        )}
-        {activeTab === 'settings' && (
-          <div className="settings-tab">
-            <h2>Settings</h2>
-            <WatchlistManager />
-          </div>
-        )}
+        </SignedOut>
+
+        <SignedIn>
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              searchTicker={selectedTicker}
+              onTickerSearched={() => setSelectedTicker(null)}
+            />
+          )}
+          {activeTab === 'backtest' && (
+            <div className="backtest-tab">
+              <BacktestForm onResults={handleBacktestResults} />
+              {backtestResult && <BacktestResults result={backtestResult} />}
+            </div>
+          )}
+          {activeTab === 'settings' && (
+            <div className="settings-tab">
+              <h2>Settings</h2>
+              <WatchlistManager />
+            </div>
+          )}
+        </SignedIn>
       </main>
     </div>
   )
