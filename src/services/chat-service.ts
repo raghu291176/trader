@@ -10,6 +10,7 @@ import { PortfolioRotationAgent } from '../agent/portfolio_rotation.js';
 import { MarketIntelligenceService } from './market-intelligence.js';
 import { PgVectorStore } from './pgvector-store.js';
 import { VectorStoreRetriever } from '@langchain/core/vectorstores';
+import { PublicSourcesSearchService } from './public-sources-search.js';
 
 export interface AzureOpenAIConfig {
   apiKey: string;
@@ -25,11 +26,13 @@ export class ChatService {
   private agent: PortfolioRotationAgent;
   private marketIntel: MarketIntelligenceService;
   private azureConfig: AzureOpenAIConfig;
+  private publicSourcesSearch: PublicSourcesSearchService;
 
   constructor(
     agent: PortfolioRotationAgent,
     azureConfig: AzureOpenAIConfig,
-    databaseUrl: string
+    databaseUrl: string,
+    finnhubApiKey: string
   ) {
     this.agent = agent;
     this.azureConfig = azureConfig;
@@ -42,6 +45,7 @@ export class ChatService {
       temperature: 0.7,
     });
     this.marketIntel = new MarketIntelligenceService(azureConfig);
+    this.publicSourcesSearch = new PublicSourcesSearchService(finnhubApiKey);
   }
 
   /**
@@ -176,37 +180,54 @@ Components:
   }
 
   /**
-   * Answer a user question using RAG
+   * Answer a user question using RAG + Public Sources
    */
-  async ask(question: string): Promise<{ answer: string; sources: string[] }> {
+  async ask(question: string, ticker?: string): Promise<{ answer: string; sources: string[] }> {
+    console.log(`📝 Answering question: "${question}"${ticker ? ` (ticker: ${ticker})` : ''}`);
+
     // Ensure vector store is initialized
     if (await this.vectorStore.getCount() === 0) {
       await this.initialize();
     }
 
-    // Search for relevant documents using pgvector similarity search
+    // Search internal RAG database
     const relevantDocs = await this.vectorStore.similaritySearch(question, 5);
 
-    // Build context from relevant documents
-    const context = relevantDocs
-      .map(doc => doc.pageContent)
+    // Search public sources
+    console.log('🔍 Searching public sources...');
+    const publicSources = await this.publicSourcesSearch.search(question, ticker);
+
+    // Build context from internal documents
+    const internalContext = relevantDocs
+      .map(doc => `[Internal Data] ${doc.pageContent}`)
       .join('\n\n---\n\n');
 
-    // Create prompt
+    // Build context from public sources
+    const publicContext = publicSources
+      .map(source => `[${source.type} - ${source.source}] ${source.content}`)
+      .join('\n\n---\n\n');
+
+    // Combine contexts
+    const fullContext = `## Internal Portfolio Data:\n${internalContext}\n\n## Public Market Data:\n${publicContext}`;
+
+    // Create enhanced prompt
     const prompt = `You are an expert financial analyst assistant for a Portfolio Rotation Trading Agent.
 
-Use the following context to answer the user's question about their portfolio, trading strategy, or market analysis.
+Use the following context to answer the user's question. The context includes both internal portfolio data and real-time public market information from news, analyst reports, and market data providers.
 
-Context:
-${context}
+${fullContext}
 
 Question: ${question}
 
-Provide a clear, data-driven answer that:
-1. Cites specific numbers and metrics from the context
-2. Explains technical indicators (RSI, MACD, catalysts) in simple terms
-3. Offers actionable insights when appropriate
-4. Keeps responses concise (2-3 paragraphs max)
+Provide a comprehensive, data-driven answer that:
+1. Synthesizes information from both internal portfolio data and public sources
+2. Cites specific numbers, metrics, and sources
+3. Explains technical indicators (RSI, MACD, catalysts) in simple terms when relevant
+4. Provides actionable insights backed by recent market data
+5. Notes the timestamp/recency of information when relevant
+6. Keeps responses clear and concise (2-4 paragraphs)
+
+IMPORTANT: Always cite your sources using the format [source_type - source_name] when referencing specific data points.
 
 Answer:`;
 
@@ -216,14 +237,20 @@ Answer:`;
       ? response.content
       : JSON.stringify(response.content);
 
-    // Extract source documents
-    const sources = relevantDocs.map(doc =>
-      `${doc.metadata.type || 'unknown'}: ${doc.pageContent.split('\n')[0]}`
+    // Compile sources (internal + public)
+    const internalSources = relevantDocs.map(doc =>
+      `[Internal] ${doc.metadata.type || 'portfolio_data'}: ${doc.pageContent.split('\n')[0]}`
     );
+
+    const publicSourcesList = this.publicSourcesSearch.formatSources(publicSources);
+
+    const allSources = [...publicSourcesList, ...internalSources];
+
+    console.log(`✅ Generated answer with ${allSources.length} sources (${publicSources.length} public, ${internalSources.length} internal)`);
 
     return {
       answer,
-      sources,
+      sources: allSources,
     };
   }
 

@@ -127,3 +127,27 @@ export type Embedding = typeof embeddings.$inferSelect;
 export type NewEmbedding = typeof embeddings.$inferInsert;
 export type PoliticianTrade = typeof politicianTrades.$inferSelect;
 export type NewPoliticianTrade = typeof politicianTrades.$inferInsert;
+
+/**
+ * Stock Data Snapshots - Timeseries storage for comprehensive stock data
+ */
+export const stockDataSnapshots = pgTable('stock_data_snapshots', {
+  id: serial('id').primaryKey(),
+  ticker: text('ticker').notNull(),
+  timestamp: timestamp('timestamp').notNull(),
+  currentPrice: real('current_price').notNull(),
+  priceChange: real('price_change').notNull(),
+  priceChangePercent: real('price_change_percent').notNull(),
+  recommendations: jsonb('recommendations'),
+  priceTarget: jsonb('price_target'),
+  metrics: jsonb('metrics'),
+  technicalIndicators: jsonb('technical_indicators'),
+  news: jsonb('news').$type<any[]>(),
+  earnings: jsonb('earnings').$type<any[]>(),
+  catalysts: jsonb('catalysts').$type<any[]>(),
+  sentiment: real('sentiment').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type StockDataSnapshot = typeof stockDataSnapshots.$inferSelect;
+export type NewStockDataSnapshot = typeof stockDataSnapshots.$inferInsert;

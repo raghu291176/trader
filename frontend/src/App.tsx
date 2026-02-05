@@ -4,23 +4,24 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { apiService } from './services/api'
 import Dashboard from './components/Dashboard'
 import { BacktestForm } from './components/BacktestForm'
 import { BacktestResults } from './components/BacktestResults'
 import WatchlistManager from './components/WatchlistManager'
+import StockDetailPage from './pages/StockDetailPage'
+import CustomTickerTape from './components/CustomTickerTape'
 import type { BacktestResult } from './types'
 import './App.css'
 
-type TabType = 'dashboard' | 'backtest' | 'settings';
-
 function App() {
   const { getToken } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard')
+  const navigate = useNavigate()
+  const location = useLocation()
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
 
   useEffect(() => {
     // Set token getter for API service
@@ -33,67 +34,78 @@ function App() {
     setBacktestResult(result)
   }
 
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      navigate(`/stock/${query.trim().toUpperCase()}`)
+      setSearchQuery('')
+    }
+  }
+
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path)
+
   return (
     <div className="app">
-      <header>
-        <div className="header-left">
-          <div className="logo-icon">
-            <span className="material-symbols-outlined">trending_up</span>
+      <div className="app-header-container">
+        <header>
+          <div className="header-left">
+            <Link to="/dashboard" className="logo">
+              <span className="material-symbols-outlined">trending_up</span>
+              <span>Trader</span>
+            </Link>
+            <nav>
+              <Link
+                to="/dashboard"
+                className={isActive('/dashboard') ? 'active' : ''}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/backtest"
+                className={isActive('/backtest') ? 'active' : ''}
+              >
+                Backtesting
+              </Link>
+              <Link
+                to="/settings"
+                className={isActive('/settings') ? 'active' : ''}
+              >
+                Settings
+              </Link>
+            </nav>
           </div>
-          <h1>Portfolio Rotation Agent</h1>
-        </div>
-        <nav className="header-nav">
-          <a
-            href="#"
-            className={activeTab === 'dashboard' ? 'active' : ''}
-            onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}
-          >
-            Dashboard
-          </a>
-          <a
-            href="#"
-            className={activeTab === 'backtest' ? 'active' : ''}
-            onClick={(e) => { e.preventDefault(); setActiveTab('backtest'); }}
-          >
-            Backtesting
-          </a>
-          <a
-            href="#"
-            className={activeTab === 'settings' ? 'active' : ''}
-            onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
-          >
-            Settings
-          </a>
-        </nav>
-        <div className="header-right">
-          <div className="search-box">
-            <span className="material-symbols-outlined">search</span>
-            <input
-              type="text"
-              placeholder="Search Ticker (e.g., AAPL)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && searchQuery.trim()) {
-                  setSelectedTicker(searchQuery.trim());
-                  setActiveTab('dashboard');
-                }
-              }}
-            />
+          <div className="header-right">
+            <div className="search-container">
+              <span className="material-symbols-outlined search-icon">search</span>
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search Ticker (e.g., AAPL)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch(searchQuery);
+                  }
+                }}
+              />
+            </div>
+            <SignedIn>
+              <button className="icon-btn">
+                <span className="material-symbols-outlined">notifications</span>
+              </button>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
           </div>
-          <SignedIn>
-            <button className="icon-btn">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
-        </div>
-      </header>
+        </header>
+
+        {/* Custom Ticker Tape - Click stocks to view details */}
+        <CustomTickerTape />
+      </div>
 
       <main>
         <SignedOut>
           <div className="welcome">
-            <h2>Welcome to Portfolio Rotation Agent</h2>
+            <h2>Welcome to Trader</h2>
             <p>Professional investment portfolio management with AI-powered stock analysis</p>
             <SignInButton mode="modal">
               <button className="btn-primary">Sign In to Get Started</button>
@@ -102,24 +114,23 @@ function App() {
         </SignedOut>
 
         <SignedIn>
-          {activeTab === 'dashboard' && (
-            <Dashboard
-              searchTicker={selectedTicker}
-              onTickerSearched={() => setSelectedTicker(null)}
-            />
-          )}
-          {activeTab === 'backtest' && (
-            <div className="backtest-tab">
-              <BacktestForm onResults={handleBacktestResults} />
-              {backtestResult && <BacktestResults result={backtestResult} />}
-            </div>
-          )}
-          {activeTab === 'settings' && (
-            <div className="settings-tab">
-              <h2>Settings</h2>
-              <WatchlistManager />
-            </div>
-          )}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/stock/:ticker" element={<StockDetailPage />} />
+            <Route path="/backtest" element={
+              <div className="backtest-tab">
+                <BacktestForm onResults={handleBacktestResults} />
+                {backtestResult && <BacktestResults result={backtestResult} />}
+              </div>
+            } />
+            <Route path="/settings" element={
+              <div className="settings-tab">
+                <h2>Settings</h2>
+                <WatchlistManager />
+              </div>
+            } />
+          </Routes>
         </SignedIn>
       </main>
     </div>

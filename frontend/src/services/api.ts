@@ -132,7 +132,12 @@ class ApiService {
     return data;
   }
 
-  async getPoliticianTrades(ticker: string): Promise<any[]> {
+  async getPoliticianTrades(politicianName: string, limit: number = 10): Promise<any> {
+    const { data } = await this.client.get(`/politician/${encodeURIComponent(politicianName)}/trades?limit=${limit}`);
+    return data;
+  }
+
+  async getPoliticianTradesForTicker(ticker: string): Promise<any[]> {
     const { data } = await this.client.get(`/market/${ticker}/politician-trades`);
     return data;
   }
@@ -140,6 +145,21 @@ class ApiService {
   async getTechnicalIndicators(ticker: string): Promise<any> {
     const { data } = await this.client.get(`/market/${ticker}/indicators`);
     return data;
+  }
+
+  /**
+   * Get latest stock data snapshot (real-time timeseries data)
+   */
+  async getStockSnapshot(ticker: string): Promise<any> {
+    const { data } = await this.client.get(`/market/${ticker}/snapshot`);
+    return data;
+  }
+
+  /**
+   * Manually trigger data ingestion for a ticker
+   */
+  async ingestStockData(ticker: string): Promise<void> {
+    await this.client.post(`/market/${ticker}/ingest`);
   }
 
   /**

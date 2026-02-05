@@ -27,11 +27,28 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
     try {
       setLoading(true)
       setError(null)
-      const [analysisData, tradesData, indicatorsData] = await Promise.all([
-        apiService.getTickerAnalysis(ticker),
-        apiService.getPoliticianTrades(ticker).catch(() => []),
+      // Use the new snapshot endpoint for real-time data
+      const [snapshotData, tradesData, indicatorsData] = await Promise.all([
+        apiService.getStockSnapshot(ticker),
+        apiService.getPoliticianTradesForTicker(ticker).catch(() => []),
         apiService.getTechnicalIndicators(ticker).catch(() => null)
       ])
+
+      // Transform snapshot data to analysis format
+      const analysisData = {
+        recommendations: snapshotData.recommendations ? [snapshotData.recommendations] : [],
+        priceTarget: snapshotData.priceTarget,
+        news: snapshotData.news || [],
+        earnings: snapshotData.earnings || [],
+        sentiment: snapshotData.sentiment,
+        metrics: snapshotData.metrics,
+        catalysts: snapshotData.catalysts || [],
+        currentPrice: snapshotData.currentPrice,
+        priceChange: snapshotData.priceChange,
+        priceChangePercent: snapshotData.priceChangePercent,
+        monthlyHigh: null, // Will be calculated from metrics
+      }
+
       setAnalysis(analysisData)
       setPoliticianTrades(tradesData)
       setIndicators(indicatorsData)
@@ -83,6 +100,23 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
   const sentimentLabel = sentiment > 0.3 ? 'Positive' : sentiment < -0.3 ? 'Negative' : 'Neutral'
   const sentimentColor = sentiment > 0.3 ? 'positive' : sentiment < -0.3 ? 'negative' : ''
 
+  // Current price from indicators or metrics
+  const currentPrice = indicators?.currentPrice || analysis?.currentPrice || metrics?.currentPrice
+  const priceChange = indicators?.priceChange || analysis?.priceChange
+  const priceChangePercent = indicators?.priceChangePercent || analysis?.priceChangePercent
+
+  // Overall rating
+  const overallRating = latestRec ?
+    (latestRec.strongBuy > 3 || bullishPercent > 70) ? 'Strong Buy' :
+    (latestRec.buy > latestRec.hold) ? 'Buy' :
+    (latestRec.hold > (latestRec.buy + latestRec.sell)) ? 'Hold' :
+    (latestRec.sell > latestRec.buy) ? 'Sell' : 'Hold'
+    : 'N/A'
+
+  const ratingClass =
+    overallRating === 'Strong Buy' || overallRating === 'Buy' ? 'positive' :
+    overallRating === 'Sell' || overallRating === 'Strong Sell' ? 'negative' : ''
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
@@ -94,6 +128,45 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
           <button className="icon-btn" onClick={onClose}>
             <span className="material-symbols-outlined">close</span>
           </button>
+        </div>
+
+        {/* Price & Rating Summary */}
+        <div className="ticker-summary">
+          <div className="price-section">
+            <label>Current Price</label>
+            <div className="current-price">
+              {currentPrice ? `$${currentPrice.toFixed(2)}` : 'Loading...'}
+            </div>
+            {priceChange !== undefined && priceChangePercent !== undefined && (
+              <div className={`price-change ${priceChange >= 0 ? 'positive' : 'negative'}`}>
+                <span className="material-symbols-outlined">
+                  {priceChange >= 0 ? 'arrow_upward' : 'arrow_downward'}
+                </span>
+                {priceChange >= 0 ? '+' : ''}${Math.abs(priceChange).toFixed(2)}
+                ({priceChange >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+              </div>
+            )}
+          </div>
+          <div className="rating-section">
+            <label>Analyst Consensus</label>
+            <div className={`overall-rating ${ratingClass}`}>
+              {overallRating}
+            </div>
+            {latestRec && (
+              <div className="rating-count">
+                {totalRecommendations} analysts • {bullishPercent.toFixed(0)}% bullish
+              </div>
+            )}
+          </div>
+          {priceTarget && (
+            <div className="target-section">
+              <label>12-Month Target</label>
+              <div className="target-price">${priceTarget.targetMean?.toFixed(2)}</div>
+              <div className="target-range">
+                ${priceTarget.targetLow?.toFixed(2)} - ${priceTarget.targetHigh?.toFixed(2)}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="modal-body">

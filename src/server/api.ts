@@ -15,10 +15,34 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { UserService } from '../services/user-service.js';
 import { FinnhubService } from '../services/finnhub-service.js';
+import { MarketData } from '../data/market_data.js';
 import { clerkMiddleware, requireAuth as clerkRequireAuth } from '@clerk/express';
 
-// Initialize Finnhub service
+// Initialize services
 const finnhubService = new FinnhubService(process.env.FINNHUB_API_KEY!);
+const marketData = new MarketData();
+
+// Initialize stock data ingestion service
+let stockDataIngestionService: any = null;
+if (process.env.DATABASE_URL && process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
+  const { StockDataIngestionService } = await import('../services/stock-data-ingestion.js');
+  stockDataIngestionService = new StockDataIngestionService(
+    process.env.FINNHUB_API_KEY!,
+    process.env.DATABASE_URL!,
+    {
+      apiKey: process.env.AZURE_OPENAI_API_KEY!,
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
+      deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4',
+      embeddingDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME || 'text-embedding-ada-002',
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
+    }
+  );
+
+  // Start continuous ingestion for top stocks (every 15 minutes)
+  const topStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX'];
+  await stockDataIngestionService.startContinuousIngestion(topStocks, 15);
+  console.log('✅ Stock data ingestion service started');
+}
 
 // Simple auth helper
 function getUserId(req: any): string {
@@ -132,11 +156,27 @@ app.get('/api/scores', requireAuth, async (req, res) => {
 
     // Combine all tickers and remove duplicates
     const allTickers = [...new Set([...top25, ...watchlistTickers, ...ownedTickers])];
+    console.log(`[/api/scores] Analyzing ${allTickers.length} tickers for user ${userId}`);
 
     const result = await agent.analyzeWatchlist(allTickers);
+    console.log(`[/api/scores] Received ${result.scores.size} scores from analysis`);
 
-    // Get current prices from positions
-    const priceMap = new Map(currentPositions.map((p: any) => [p.ticker, p.currentPrice]));
+    // Fetch current prices for all tickers using MarketData
+    const pricePromises = allTickers.map(async (ticker) => {
+      try {
+        const candles = await marketData.fetchCandles(ticker, 1);
+        const latestPrice = candles.prices.length > 0 ? candles.prices[candles.prices.length - 1] : 0;
+        return [ticker, latestPrice] as [string, number];
+      } catch (error) {
+        console.error(`Failed to fetch price for ${ticker}:`, error);
+        return [ticker, 0] as [string, number];
+      }
+    });
+
+    const prices = await Promise.all(pricePromises);
+    const priceMap = new Map(prices);
+    const pricesWithValues = Array.from(priceMap.entries()).filter(([_, price]) => price > 0);
+    console.log(`[/api/scores] Fetched ${pricesWithValues.length}/${allTickers.length} prices successfully`);
 
     const scores = Array.from(result.scores.entries()).map(([ticker, score]) => {
       return {
@@ -147,6 +187,7 @@ app.get('/api/scores', requireAuth, async (req, res) => {
       };
     }).sort((a, b) => b.score - a.score);
 
+    console.log(`[/api/scores] Returning top 5 scores:`, scores.slice(0, 5).map(s => ({ ticker: s.ticker, score: s.score, price: s.currentPrice })));
     res.json(scores);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -395,6 +436,23 @@ app.get('/api/market/:ticker/politician-trades', requireAuth, async (req, res) =
 });
 
 /**
+ * GET /api/politician/:name/trades - Get trades by politician name
+ */
+app.get('/api/politician/:name/trades', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+    const { PoliticianTradesDatabase } = await import('../services/politician-trades-db.js');
+    const tradesDb = new PoliticianTradesDatabase(process.env.DATABASE_URL!);
+
+    const trades = await tradesDb.getTradesByPolitician(name, limit);
+    res.json({ trades });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
  * GET /api/market/:ticker/indicators - Get technical indicators
  */
 app.get('/api/market/:ticker/indicators', requireAuth, async (req, res) => {
@@ -473,6 +531,83 @@ app.get('/api/market/:ticker/chart', requireAuth, async (req, res) => {
     }));
 
     res.json(candles);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/market/:ticker/snapshot - Get latest stock data snapshot (timeseries)
+ * Returns real-time comprehensive stock data including prices, analyst data, news, earnings, etc.
+ */
+app.get('/api/market/:ticker/snapshot', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+
+    // If ingestion service is available, get from timeseries database
+    if (stockDataIngestionService) {
+      let snapshot = await stockDataIngestionService.getLatestSnapshot(ticker.toUpperCase());
+
+      // If no snapshot exists or it's older than 15 minutes, ingest fresh data
+      if (!snapshot || (new Date().getTime() - snapshot.timestamp.getTime()) > 15 * 60 * 1000) {
+        snapshot = await stockDataIngestionService.ingestStockData(ticker.toUpperCase());
+      }
+
+      return res.json(snapshot);
+    }
+
+    // Fallback: fetch fresh data directly from Finnhub
+    const analysis = await finnhubService.getTickerAnalysis(ticker.toUpperCase());
+
+    // Get current price
+    const candleData = await marketData.fetchCandles(ticker.toUpperCase(), 5);
+    const currentPrice = candleData.prices[candleData.prices.length - 1] || 0;
+    const previousPrice = candleData.prices[candleData.prices.length - 2] || currentPrice;
+    const priceChange = currentPrice - previousPrice;
+    const priceChangePercent = (priceChange / previousPrice) * 100;
+
+    // Build snapshot
+    const snapshot = {
+      ticker: ticker.toUpperCase(),
+      timestamp: new Date(),
+      currentPrice,
+      priceChange,
+      priceChangePercent,
+      recommendations: analysis.recommendations[0] ? {
+        strongBuy: analysis.recommendations[0].strongBuy,
+        buy: analysis.recommendations[0].buy,
+        hold: analysis.recommendations[0].hold,
+        sell: analysis.recommendations[0].sell,
+        strongSell: analysis.recommendations[0].strongSell,
+      } : undefined,
+      priceTarget: analysis.priceTarget,
+      metrics: analysis.metrics,
+      news: analysis.news.slice(0, 10),
+      earnings: analysis.earnings,
+      catalysts: analysis.catalysts,
+      sentiment: analysis.sentiment,
+    };
+
+    res.json(snapshot);
+  } catch (error) {
+    console.error(`Failed to get snapshot for ${req.params.ticker}:`, error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/market/:ticker/ingest - Manually trigger data ingestion for a ticker
+ */
+app.post('/api/market/:ticker/ingest', requireAuth, async (req, res) => {
+  try {
+    const { ticker } = req.params;
+
+    if (!stockDataIngestionService) {
+      return res.status(503).json({ error: 'Stock data ingestion service not available' });
+    }
+
+    const snapshot = await stockDataIngestionService.ingestStockData(ticker.toUpperCase());
+    res.json({ success: true, snapshot });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

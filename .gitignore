@@ -24,3 +24,22 @@ yarn-error.log*
 
 # OS
 .DS_Store
+
+# Backup and temporary files
+*.backup
+*.old
+*-new.*
+*-old.*
+*.zip
+.deploy-temp/
+.azure/
+shellscr/
+app-logs/
+deployments/
+requirements.txt
+
+# Frontend build
+frontend/dist/
+
+# Task outputs
+/private/tmp/

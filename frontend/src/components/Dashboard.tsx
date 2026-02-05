@@ -4,18 +4,17 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiService } from '../services/api'
 import type { Portfolio, Position, Trade, Score } from '../types'
-import TickerAnalysis from './TickerAnalysis'
 import PoliticianTrades from './PoliticianTrades'
 import CollapsibleCard from './CollapsibleCard'
+import MarketHot from './MarketHot'
+import BiggestMovers from './BiggestMovers'
+import HeroBalanceCard from './HeroBalanceCard'
 
-interface DashboardProps {
-  searchTicker?: string | null;
-  onTickerSearched?: () => void;
-}
-
-export default function Dashboard({ searchTicker, onTickerSearched }: DashboardProps) {
+export default function Dashboard() {
+  const navigate = useNavigate()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -23,15 +22,6 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
-
-  // Handle search ticker from header
-  useEffect(() => {
-    if (searchTicker) {
-      setSelectedTicker(searchTicker);
-      onTickerSearched?.();
-    }
-  }, [searchTicker, onTickerSearched]);
 
   useEffect(() => {
     loadData()
@@ -123,35 +113,45 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
         </div>
       )}
 
-      {/* Top Stats Row */}
+      {/* Hero Balance Card */}
       {portfolio && (
-        <div className="stats-row">
-          <div className="stat-card">
-            <label>Portfolio Value</label>
-            <div className="value">${portfolio.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          </div>
-          <div className="stat-card">
-            <label>24h Change</label>
-            <div className={`value ${portfolio.unrealizedPnL >= 0 ? 'positive' : 'negative'}`}>
-              {portfolio.unrealizedPnL >= 0 ? '+' : ''}${portfolio.unrealizedPnL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({portfolio.unrealizedPnLPercent >= 0 ? '+' : ''}{portfolio.unrealizedPnLPercent.toFixed(2)}%)
+        <>
+          <HeroBalanceCard
+            portfolioValue={portfolio.totalValue}
+            dayChange={portfolio.unrealizedPnL}
+            dayChangePercent={portfolio.unrealizedPnLPercent}
+          />
+
+          {/* Quick Stats Strip */}
+          <div className="stats-row">
+            <div className="stat-card">
+              <label>Total Return</label>
+              <div className={`value ${portfolio.unrealizedPnLPercent >= 0 ? 'positive' : 'negative'}`}>
+                {portfolio.unrealizedPnLPercent >= 0 ? '+' : ''}{portfolio.unrealizedPnLPercent.toFixed(1)}%
+              </div>
+            </div>
+            <div className="stat-card">
+              <label>Max Drawdown</label>
+              <div className="value negative">{portfolio.maxDrawdown.toFixed(1)}%</div>
+            </div>
+            <div className="stat-card">
+              <label>Sharpe Ratio</label>
+              <div className="value">1.85</div>
+            </div>
+            <div className="stat-card">
+              <label>Win Rate</label>
+              <div className="value">68%</div>
             </div>
           </div>
-          <div className="stat-card">
-            <label>Total Return</label>
-            <div className={`value ${portfolio.unrealizedPnLPercent >= 0 ? 'positive' : 'negative'}`}>
-              {portfolio.unrealizedPnLPercent >= 0 ? '+' : ''}{portfolio.unrealizedPnLPercent.toFixed(1)}%
-            </div>
-          </div>
-          <div className="stat-card">
-            <label>Max Drawdown</label>
-            <div className="value negative">{portfolio.maxDrawdown.toFixed(1)}%</div>
-          </div>
-          <div className="stat-card">
-            <label>Sharpe Ratio</label>
-            <div className="value">1.85</div>
-          </div>
-        </div>
+        </>
       )}
+
+      {/* Market Pulse - Hot Section */}
+      <div className="section-header">
+        <div className="section-header__title">Market Pulse</div>
+        <div className="section-header__subtitle">What's hot in the market right now</div>
+      </div>
+      <MarketHot />
 
       {/* Main Layout with Sidebar */}
       <div className="dashboard-layout">
@@ -176,7 +176,14 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
                 <tbody>
                   {positions.map((pos) => (
                     <tr key={pos.ticker}>
-                      <td><strong>{pos.ticker}</strong></td>
+                      <td>
+                        <strong
+                          style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                          onClick={() => navigate(`/stock/${pos.ticker}`)}
+                        >
+                          {pos.ticker}
+                        </strong>
+                      </td>
                       <td>{pos.shares.toLocaleString()}</td>
                       <td>${pos.entryPrice.toFixed(2)}</td>
                       <td>${pos.currentPrice.toFixed(2)}</td>
@@ -247,10 +254,15 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
                         <td>#{idx + 1}</td>
                         <td>
                           <div>
-                            <strong>{score.ticker}</strong>
+                            <strong
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => navigate(`/stock/${score.ticker}`)}
+                            >
+                              {score.ticker}
+                            </strong>
                           </div>
                         </td>
-                        <td>${score.currentPrice?.toFixed(2) || 'N/A'}</td>
+                        <td>{score.currentPrice ? `$${score.currentPrice.toFixed(2)}` : '--'}</td>
                         <td><strong>{score.score.toFixed(2)}</strong></td>
                         <td>
                           <div className="prd-badges">
@@ -269,7 +281,7 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
                             <button className="btn-buy" onClick={() => handleBuyStock(score.ticker)}>
                               Buy
                             </button>
-                            <button className="btn-analyze" onClick={() => setSelectedTicker(score.ticker)}>
+                            <button className="btn-analyze" onClick={() => navigate(`/stock/${score.ticker}`)}>
                               Analyze
                             </button>
                           </div>
@@ -329,11 +341,6 @@ export default function Dashboard({ searchTicker, onTickerSearched }: DashboardP
           <PoliticianTrades />
         </aside>
       </div>
-
-      {/* Ticker Analysis Modal */}
-      {selectedTicker && (
-        <TickerAnalysis ticker={selectedTicker} onClose={() => setSelectedTicker(null)} />
-      )}
 
       {/* Portfolio Assistant Chat Widget */}
       <div className="portfolio-assistant">
