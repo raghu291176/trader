@@ -10,9 +10,10 @@ import PriceChart from './PriceChart'
 interface TickerAnalysisProps {
   ticker: string
   onClose: () => void
+  inline?: boolean
 }
 
-export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps) {
+export default function TickerAnalysis({ ticker, onClose, inline = false }: TickerAnalysisProps) {
   const [loading, setLoading] = useState(true)
   const [analysis, setAnalysis] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -60,6 +61,9 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
   }
 
   if (loading) {
+    if (inline) {
+      return <div className="loading">Loading analysis for {ticker}...</div>
+    }
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -70,6 +74,14 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
   }
 
   if (error) {
+    if (inline) {
+      return (
+        <div>
+          <div className="error">Error: {error}</div>
+          <button className="btn-primary" onClick={onClose}>Back to Dashboard</button>
+        </div>
+      )
+    }
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -106,7 +118,7 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
   const priceChangePercent = indicators?.priceChangePercent || analysis?.priceChangePercent
 
   // Overall rating
-  const overallRating = latestRec ?
+  const overallRating: string = latestRec ?
     (latestRec.strongBuy > 3 || bullishPercent > 70) ? 'Strong Buy' :
     (latestRec.buy > latestRec.hold) ? 'Buy' :
     (latestRec.hold > (latestRec.buy + latestRec.sell)) ? 'Hold' :
@@ -117,10 +129,10 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
     overallRating === 'Strong Buy' || overallRating === 'Buy' ? 'positive' :
     overallRating === 'Sell' || overallRating === 'Strong Sell' ? 'negative' : ''
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+  const analysisContent = (
+    <>
+      {/* Header */}
+      {!inline && (
         <div className="modal-header">
           <h2>
             <strong>{ticker}</strong> Analysis
@@ -129,6 +141,7 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
+      )}
 
         {/* Price & Rating Summary */}
         <div className="ticker-summary">
@@ -317,7 +330,7 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
                 Price Catalysts
               </h3>
               <div className="catalysts-list">
-                {catalysts.map((catalyst, idx) => (
+                {catalysts.map((catalyst: any, idx: number) => (
                   <div key={idx} className={`catalyst-item ${catalyst.impact}`}>
                     <div className="catalyst-icon">
                       <span className="material-symbols-outlined">
@@ -556,9 +569,22 @@ export default function TickerAnalysis({ ticker, onClose }: TickerAnalysisProps)
           )}
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Close</button>
-        </div>
+        {!inline && (
+          <div className="modal-footer">
+            <button className="btn-secondary" onClick={onClose}>Close</button>
+          </div>
+        )}
+    </>
+  )
+
+  if (inline) {
+    return <div className="ticker-analysis-inline">{analysisContent}</div>
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+        {analysisContent}
       </div>
     </div>
   )

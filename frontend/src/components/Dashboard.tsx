@@ -6,11 +6,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiService } from '../services/api'
-import type { Portfolio, Position, Trade, Score } from '../types'
+import type { Portfolio, Position, Trade, Score, ChatMessage, ChatAction } from '../types'
 import PoliticianTrades from './PoliticianTrades'
 import CollapsibleCard from './CollapsibleCard'
 import MarketHot from './MarketHot'
 import BiggestMovers from './BiggestMovers'
+import TopMovers from './TopMovers'
 import HeroBalanceCard from './HeroBalanceCard'
 
 export default function Dashboard() {
@@ -22,6 +23,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatExpanded, setChatExpanded] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -96,6 +101,44 @@ export default function Dashboard() {
     }
   }
 
+  async function handleChatSend() {
+    const question = chatInput.trim()
+    if (!question || chatLoading) return
+
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', content: question }])
+    setChatLoading(true)
+
+    try {
+      const response = await apiService.chat(question)
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: response.answer,
+        sources: response.sources,
+        actions: response.actions as ChatAction[] | undefined,
+      }])
+    } catch {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I could not process your question. The chat service may be unavailable.',
+      }])
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
+  function handleChatAction(action: ChatAction) {
+    if (action.type === 'buy' && action.ticker) {
+      handleBuyStock(action.ticker)
+    } else if (action.type === 'sell' && action.ticker) {
+      handleSellStock(action.ticker)
+    } else if (action.type === 'analyze' && action.ticker) {
+      navigate(`/stock/${action.ticker}`)
+    } else if (action.type === 'rebalance') {
+      handleRebalance()
+    }
+  }
+
   if (loading && !portfolio) {
     return <div className="loading">Loading...</div>
   }
@@ -151,7 +194,10 @@ export default function Dashboard() {
         <div className="section-header__title">Market Pulse</div>
         <div className="section-header__subtitle">What's hot in the market right now</div>
       </div>
-      <MarketHot />
+      <MarketHot scores={scores} />
+
+      {/* Biggest Movers */}
+      <BiggestMovers scores={scores} />
 
       {/* Main Layout with Sidebar */}
       <div className="dashboard-layout">
@@ -178,7 +224,7 @@ export default function Dashboard() {
                     <tr key={pos.ticker}>
                       <td>
                         <strong
-                          style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                          className="ticker-link"
                           onClick={() => navigate(`/stock/${pos.ticker}`)}
                         >
                           {pos.ticker}
@@ -255,7 +301,7 @@ export default function Dashboard() {
                         <td>
                           <div>
                             <strong
-                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              className="ticker-link"
                               onClick={() => navigate(`/stock/${score.ticker}`)}
                             >
                               {score.ticker}
@@ -277,7 +323,7 @@ export default function Dashboard() {
                           {score.score > 0.5 ? '+' : ''}{(score.score - 0.5).toFixed(2)} vs AVG
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div className="action-buttons">
                             <button className="btn-buy" onClick={() => handleBuyStock(score.ticker)}>
                               Buy
                             </button>
@@ -338,13 +384,21 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <div className="card">
+            <h2>
+              <span className="material-symbols-outlined">trending_up</span>
+              Top Movers
+            </h2>
+            <TopMovers scores={scores} />
+          </div>
+
           <PoliticianTrades />
         </aside>
       </div>
 
       {/* Portfolio Assistant Chat Widget */}
-      <div className="portfolio-assistant">
-        <div className="assistant-header">
+      <div className={`portfolio-assistant ${chatExpanded ? 'expanded' : ''}`}>
+        <div className="assistant-header" onClick={() => setChatExpanded(!chatExpanded)}>
           <div className="assistant-icon">
             <span className="material-symbols-outlined">smart_toy</span>
           </div>
@@ -352,47 +406,99 @@ export default function Dashboard() {
             <div className="assistant-title">Portfolio Assistant</div>
             <div className="assistant-status">
               <span className="status-dot"></span>
-              Online • Analyzing
+              {chatLoading ? 'Thinking...' : 'Online'}
             </div>
           </div>
           <button className="icon-btn">
-            <span className="material-symbols-outlined">expand_more</span>
+            <span className="material-symbols-outlined">
+              {chatExpanded ? 'expand_more' : 'expand_less'}
+            </span>
           </button>
         </div>
-        <div className="assistant-messages">
-          {scores.length > 0 && scores[0] && (
-            <div className="assistant-message">
-              <div className="message-icon">
-                <span className="material-symbols-outlined">smart_toy</span>
-              </div>
-              <div className="message-content">
-                I've ranked <strong>{scores[0].ticker} #1</strong> based on current market analysis.
-                <div className="message-meta">
-                  <span className="badge badge-vol">Score: {scores[0].score.toFixed(2)}</span>
-                  {scores[0].components?.momentum && (
-                    <span className="badge badge-rsi">Mom: {(scores[0].components.momentum * 100).toFixed(0)}%</span>
-                  )}
+        {chatExpanded && (
+          <>
+            <div className="assistant-messages">
+              {chatMessages.length === 0 && (
+                <div className="assistant-message">
+                  <div className="message-icon">
+                    <span className="material-symbols-outlined">smart_toy</span>
+                  </div>
+                  <div className="message-content">
+                    {scores.length > 0 && scores[0]
+                      ? <>I've ranked <strong>{scores[0].ticker} #1</strong> based on current market analysis. </>
+                      : null
+                    }
+                    I can help with your portfolio, technical analysis, analyst ratings, politician trades, and trading. Try asking:
+                    <div className="message-suggestions">
+                      {['What should I buy?', 'Analyze my risk', 'What are politicians trading?'].map(q => (
+                        <button key={q} className="suggestion-chip" onClick={() => { setChatInput(q); }}>
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`assistant-message ${msg.role === 'user' ? 'user-message' : ''}`}>
+                  <div className="message-icon">
+                    <span className="material-symbols-outlined">
+                      {msg.role === 'user' ? 'person' : 'smart_toy'}
+                    </span>
+                  </div>
+                  <div className="message-content">
+                    {msg.content}
+                    {msg.actions && msg.actions.length > 0 && (
+                      <div className="message-actions">
+                        {msg.actions.map((action, actionIdx) => (
+                          <button
+                            key={actionIdx}
+                            className={`chat-action-btn chat-action-${action.type}`}
+                            onClick={() => handleChatAction(action)}
+                          >
+                            <span className="material-symbols-outlined">
+                              {action.type === 'buy' ? 'add_shopping_cart' :
+                               action.type === 'sell' ? 'sell' :
+                               action.type === 'analyze' ? 'analytics' :
+                               'sync'}
+                            </span>
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="message-sources">
+                        <small>Sources: {msg.sources.slice(0, 3).join(', ')}</small>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="assistant-message">
+                  <div className="message-icon">
+                    <span className="material-symbols-outlined">smart_toy</span>
+                  </div>
+                  <div className="message-content">Analyzing...</div>
+                </div>
+              )}
             </div>
-          )}
-          {scores.length === 0 && (
-            <div className="assistant-message">
-              <div className="message-icon">
-                <span className="material-symbols-outlined">smart_toy</span>
-              </div>
-              <div className="message-content">
-                Analyzing market opportunities...
-              </div>
+            <div className="assistant-input">
+              <input
+                type="text"
+                placeholder="Ask about holdings, market, strategy..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
+                disabled={chatLoading}
+              />
+              <button className="icon-btn" onClick={handleChatSend} disabled={chatLoading}>
+                <span className="material-symbols-outlined">send</span>
+              </button>
             </div>
-          )}
-        </div>
-        <div className="assistant-input">
-          <input type="text" placeholder="Ask about holdings..." />
-          <button className="icon-btn">
-            <span className="material-symbols-outlined">send</span>
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </>
   )

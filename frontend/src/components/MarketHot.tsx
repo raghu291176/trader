@@ -3,7 +3,9 @@
  * Horizontal scroll with pulse cards
  */
 
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { Score } from '../types'
 
 interface HotStock {
   ticker: string
@@ -11,19 +13,38 @@ interface HotStock {
   price: number
   change: number
   changePercent: number
-  sparkline: number[]
+  sparkline?: number[]
 }
 
-export default function MarketHot() {
+interface MarketHotProps {
+  scores?: Score[]
+}
+
+export default function MarketHot({ scores }: MarketHotProps) {
   const navigate = useNavigate()
 
-  const trending: HotStock[] = [
-    { ticker: 'NVDA', name: 'NVIDIA', price: 725.50, change: 45.23, changePercent: 6.65, sparkline: [680, 685, 690, 695, 710, 725] },
-    { ticker: 'TSLA', name: 'Tesla', price: 275.80, change: 15.42, changePercent: 5.92, sparkline: [260, 262, 268, 270, 272, 275] },
-    { ticker: 'AMD', name: 'AMD', price: 165.30, change: 8.95, changePercent: 5.72, sparkline: [156, 158, 160, 162, 164, 165] },
-    { ticker: 'META', name: 'Meta', price: 485.20, change: 28.15, changePercent: 6.16, sparkline: [457, 460, 470, 475, 480, 485] },
-    { ticker: 'AAPL', name: 'Apple', price: 185.25, change: 5.15, changePercent: 2.86, sparkline: [180, 181, 182, 183, 184, 185] },
-  ]
+  const trending: HotStock[] = useMemo(() => {
+    const scoresWithPrice = scores?.filter(s => s.currentPrice && s.priceChange !== undefined) || []
+    if (scoresWithPrice.length > 0) {
+      return [...scoresWithPrice]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+        .map(s => ({
+          ticker: s.ticker,
+          name: s.ticker,
+          price: s.currentPrice || 0,
+          change: s.priceChange || 0,
+          changePercent: s.priceChangePercent || 0,
+        }))
+    }
+    return [
+      { ticker: 'NVDA', name: 'NVIDIA', price: 725.50, change: 45.23, changePercent: 6.65, sparkline: [680, 685, 690, 695, 710, 725] },
+      { ticker: 'TSLA', name: 'Tesla', price: 275.80, change: 15.42, changePercent: 5.92, sparkline: [260, 262, 268, 270, 272, 275] },
+      { ticker: 'AMD', name: 'AMD', price: 165.30, change: 8.95, changePercent: 5.72, sparkline: [156, 158, 160, 162, 164, 165] },
+      { ticker: 'META', name: 'Meta', price: 485.20, change: 28.15, changePercent: 6.16, sparkline: [457, 460, 470, 475, 480, 485] },
+      { ticker: 'AAPL', name: 'Apple', price: 185.25, change: 5.15, changePercent: 2.86, sparkline: [180, 181, 182, 183, 184, 185] },
+    ]
+  }, [scores])
 
   const mostBought: HotStock[] = [
     { ticker: 'AAPL', name: 'Apple', price: 185.25, change: 5.15, changePercent: 2.86, sparkline: [180, 181, 182, 183, 184, 185] },
@@ -82,7 +103,7 @@ export default function MarketHot() {
             <div className="pulse-card__name">{stock.name}</div>
           </div>
         </div>
-        {renderSparkline(stock.sparkline, isPositive)}
+        {stock.sparkline && renderSparkline(stock.sparkline, isPositive)}
         <div className="pulse-card__footer">
           <div className="pulse-card__price">
             ${stock.price.toFixed(2)}
@@ -99,11 +120,11 @@ export default function MarketHot() {
     <div>
       {/* Trending Section */}
       <div className="market-pulse-container">
-        <div className="section-header" style={{ paddingTop: 0, marginBottom: 'var(--space-md)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <div className="section-header section-header--compact">
+          <h3 className="section-header--compact__title">
             Trending
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+          <p className="section-header--compact__subtitle">
             Highest 24h trading volume change
           </p>
         </div>
@@ -114,11 +135,11 @@ export default function MarketHot() {
 
       {/* Most Bought Section */}
       <div className="market-pulse-container">
-        <div className="section-header" style={{ paddingTop: 0, marginBottom: 'var(--space-md)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <div className="section-header section-header--compact">
+          <h3 className="section-header--compact__title">
             Most bought
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+          <p className="section-header--compact__subtitle">
             Top 5 assets bought in the past 24h
           </p>
         </div>
@@ -129,11 +150,11 @@ export default function MarketHot() {
 
       {/* Most Sold Section */}
       <div className="market-pulse-container">
-        <div className="section-header" style={{ paddingTop: 0, marginBottom: 'var(--space-md)' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <div className="section-header section-header--compact">
+          <h3 className="section-header--compact__title">
             Most sold
           </h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+          <p className="section-header--compact__subtitle">
             Top 5 assets sold in the past 24h
           </p>
         </div>

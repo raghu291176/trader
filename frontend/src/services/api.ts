@@ -174,6 +174,24 @@ class ApiService {
     const { data } = await this.client.post('/backtest/compare', { configs });
     return data;
   }
+
+  /**
+   * Chat endpoints
+   */
+  async chat(question: string, ticker?: string): Promise<{
+    answer: string;
+    sources: string[];
+    actions?: Array<{ type: string; ticker?: string; label: string }>;
+    timestamp: string;
+  }> {
+    const { data } = await this.client.post('/chat', { question, ticker });
+    return data;
+  }
+
+  async getChatSuggestions(): Promise<string[]> {
+    const { data } = await this.client.get<{ suggestions: string[] }>('/chat/suggestions');
+    return data.suggestions;
+  }
 }
 
 export const apiService = new ApiService();

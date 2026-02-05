@@ -196,12 +196,12 @@ export const BacktestResults: React.FC<BacktestResultsProps> = ({ result }) => {
           </svg>
           <div className="chart-legend">
             <div className="legend-item">
-              <span className="legend-color" style={{ backgroundColor: 'var(--emerald)' }}></span>
+              <span className="legend-color legend-color--strategy"></span>
               <span>Strategy</span>
             </div>
             {benchmarkReturns && benchmarkReturns.length > 0 && (
               <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: 'var(--slate-400)' }}></span>
+                <span className="legend-color legend-color--benchmark"></span>
                 <span>Benchmark (SPY)</span>
               </div>
             )}

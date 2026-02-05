@@ -115,3 +115,17 @@ export interface BacktestResult {
   metrics: BacktestMetrics;
   benchmarkReturns?: { date: string; value: number; return: number }[];
 }
+
+export interface ChatAction {
+  type: 'buy' | 'sell' | 'analyze' | 'rebalance';
+  ticker?: string;
+  label: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: string[];
+  actions?: ChatAction[];
+  timestamp?: string;
+}

@@ -77,9 +77,32 @@ app.use(express.static(path.join(__dirname, '../../public')));
 // Initialize UserService for multi-user support
 const userService = new UserService(process.env.DATABASE_URL!);
 
-// TODO: Refactor ChatService to support per-user instances
-// For now, chat service is disabled in multi-user mode
-const chatService = null;
+// Initialize ChatService with all integrated services (trading, technicals, sentiment, politicians)
+let chatService: any = null;
+if (process.env.DATABASE_URL && process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT && process.env.FINNHUB_API_KEY) {
+  try {
+    const { ChatService } = await import('../services/chat-service.js');
+    const { PortfolioRotationAgent } = await import('../agent/portfolio_rotation.js');
+
+    const sharedAgent = new PortfolioRotationAgent(10000);
+    chatService = new ChatService(
+      sharedAgent,
+      {
+        apiKey: process.env.AZURE_OPENAI_API_KEY!,
+        endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
+        deploymentName: process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'gpt-4',
+        embeddingDeploymentName: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME || 'text-embedding-ada-002',
+        apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview',
+      },
+      process.env.DATABASE_URL!,
+      process.env.FINNHUB_API_KEY!,
+      { stockDataIngestionService }
+    );
+    console.log('Chat service initialized (integrated with trading, technicals, sentiment, politicians)');
+  } catch (err) {
+    console.error('Failed to initialize chat service:', err);
+  }
+}
 
 // Protected API Endpoints (require authentication)
 
@@ -161,29 +184,35 @@ app.get('/api/scores', requireAuth, async (req, res) => {
     const result = await agent.analyzeWatchlist(allTickers);
     console.log(`[/api/scores] Received ${result.scores.size} scores from analysis`);
 
-    // Fetch current prices for all tickers using MarketData
+    // Fetch current prices and price changes for all tickers using MarketData
     const pricePromises = allTickers.map(async (ticker) => {
       try {
-        const candles = await marketData.fetchCandles(ticker, 1);
+        const candles = await marketData.fetchCandles(ticker, 5);
         const latestPrice = candles.prices.length > 0 ? candles.prices[candles.prices.length - 1] : 0;
-        return [ticker, latestPrice] as [string, number];
+        const previousPrice = candles.prices.length > 1 ? candles.prices[candles.prices.length - 2] : latestPrice;
+        const priceChange = latestPrice - previousPrice;
+        const priceChangePercent = previousPrice > 0 ? (priceChange / previousPrice) * 100 : 0;
+        return [ticker, { currentPrice: latestPrice, priceChange, priceChangePercent }] as [string, { currentPrice: number; priceChange: number; priceChangePercent: number }];
       } catch (error) {
         console.error(`Failed to fetch price for ${ticker}:`, error);
-        return [ticker, 0] as [string, number];
+        return [ticker, { currentPrice: 0, priceChange: 0, priceChangePercent: 0 }] as [string, { currentPrice: number; priceChange: number; priceChangePercent: number }];
       }
     });
 
     const prices = await Promise.all(pricePromises);
     const priceMap = new Map(prices);
-    const pricesWithValues = Array.from(priceMap.entries()).filter(([_, price]) => price > 0);
+    const pricesWithValues = Array.from(priceMap.entries()).filter(([_, data]) => data.currentPrice > 0);
     console.log(`[/api/scores] Fetched ${pricesWithValues.length}/${allTickers.length} prices successfully`);
 
     const scores = Array.from(result.scores.entries()).map(([ticker, score]) => {
+      const priceData = priceMap.get(ticker) || { currentPrice: 0, priceChange: 0, priceChangePercent: 0 };
       return {
         ticker,
         score: typeof score === 'number' ? score : (score as any).expectedReturn,
         components: typeof score === 'number' ? {} : (score as any).components,
-        currentPrice: priceMap.get(ticker) || 0,
+        currentPrice: priceData.currentPrice,
+        priceChange: priceData.priceChange,
+        priceChangePercent: priceData.priceChangePercent,
       };
     }).sort((a, b) => b.score - a.score);
 
@@ -615,8 +644,9 @@ app.post('/api/market/:ticker/ingest', requireAuth, async (req, res) => {
 
 /**
  * POST /api/chat - Ask questions about portfolio with RAG
+ * Integrates: user portfolio, trading, technicals, sentiment, politician trades
  */
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   try {
     if (!chatService) {
       return res.status(503).json({
@@ -624,23 +654,23 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    const { question } = req.body;
+    const { question, ticker } = req.body;
 
     if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'Question is required' });
     }
 
-    // Initialize RAG if first time
-    if (!chatService['qaChain']) {
-      await chatService.initialize();
-    }
+    // Get user-specific agent for personalized portfolio context
+    const userId = getUserId(req);
+    const agent = await userService.getUserAgent(userId);
 
-    // Get answer using RAG
-    const result = await chatService.ask(question);
+    // Get answer using RAG with user's portfolio context
+    const result = await chatService.ask(question, { ticker, agent });
 
     res.json({
       answer: result.answer,
       sources: result.sources,
+      actions: result.actions || [],
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -650,15 +680,17 @@ app.post('/api/chat', async (req, res) => {
 });
 
 /**
- * GET /api/chat/suggestions - Get suggested questions
+ * GET /api/chat/suggestions - Get suggested questions (user-specific)
  */
-app.get('/api/chat/suggestions', (req, res) => {
+app.get('/api/chat/suggestions', requireAuth, async (req, res) => {
   try {
     if (!chatService) {
       return res.json({ suggestions: [] });
     }
 
-    const suggestions = chatService.getSuggestedQuestions();
+    const userId = getUserId(req);
+    const agent = await userService.getUserAgent(userId);
+    const suggestions = chatService.getSuggestedQuestions(agent);
     res.json({ suggestions });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

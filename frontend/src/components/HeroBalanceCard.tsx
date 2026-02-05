@@ -37,7 +37,7 @@ export default function HeroBalanceCard({
           <span>
             ({isPositive ? '+' : ''}{dayChangePercent.toFixed(2)}%)
           </span>
-          <span style={{ marginLeft: '8px', fontSize: '14px', opacity: 0.7 }}>
+          <span className="hero-balance-card__today">
             Today
           </span>
         </div>

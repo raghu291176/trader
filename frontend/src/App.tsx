@@ -4,14 +4,14 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { apiService } from './services/api'
 import Dashboard from './components/Dashboard'
 import { BacktestForm } from './components/BacktestForm'
 import { BacktestResults } from './components/BacktestResults'
-import WatchlistManager from './components/WatchlistManager'
 import StockDetailPage from './pages/StockDetailPage'
+import SettingsPage from './pages/SettingsPage'
 import CustomTickerTape from './components/CustomTickerTape'
 import type { BacktestResult } from './types'
 import './App.css'
@@ -124,12 +124,8 @@ function App() {
                 {backtestResult && <BacktestResults result={backtestResult} />}
               </div>
             } />
-            <Route path="/settings" element={
-              <div className="settings-tab">
-                <h2>Settings</h2>
-                <WatchlistManager />
-              </div>
-            } />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </SignedIn>
       </main>

@@ -8,7 +8,7 @@ import { apiService } from '../services/api'
 
 export default function WatchlistManager() {
   const [watchlists, setWatchlists] = useState<Array<{ id: number; name: string; tickers: string[] }>>([])
-  const [selectedWatchlist, setSelectedWatchlist] = useState<string>('default')
+  const [selectedWatchlist] = useState<string>('default')
   const [newTicker, setNewTicker] = useState('')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -139,111 +139,6 @@ export default function WatchlistManager() {
         </div>
       </div>
 
-      <style>{`
-        .watchlist-manager {
-          max-width: 800px;
-        }
-
-        .watchlist-controls {
-          margin-bottom: 2rem;
-        }
-
-        .ticker-input-group {
-          display: flex;
-          gap: 0.75rem;
-        }
-
-        .ticker-input {
-          flex: 1;
-          background: var(--surface-darker);
-          border: 1px solid var(--border-dark);
-          color: var(--text-primary);
-          padding: 0.75rem 1rem;
-          border-radius: 0.5rem;
-          font-size: 0.9375rem;
-          font-family: 'Fira Code', monospace;
-          text-transform: uppercase;
-        }
-
-        .ticker-input:focus {
-          outline: none;
-          border-color: var(--primary);
-        }
-
-        .ticker-input::placeholder {
-          text-transform: none;
-          font-family: system-ui, sans-serif;
-        }
-
-        .tickers-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-          gap: 0.75rem;
-        }
-
-        .ticker-chip {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: var(--surface-darker);
-          border: 1px solid var(--border-dark);
-          border-radius: 0.5rem;
-          padding: 0.75rem 1rem;
-          transition: all 0.2s;
-        }
-
-        .ticker-chip:hover {
-          border-color: var(--primary);
-        }
-
-        .ticker-symbol {
-          font-family: 'Fira Code', monospace;
-          font-weight: 600;
-          font-size: 0.9375rem;
-          color: var(--text-primary);
-        }
-
-        .remove-btn {
-          background: transparent;
-          border: none;
-          color: var(--text-secondary);
-          cursor: pointer;
-          padding: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: color 0.2s;
-        }
-
-        .remove-btn:hover {
-          color: var(--rose);
-        }
-
-        .remove-btn .material-symbols-outlined {
-          font-size: 1.125rem;
-        }
-
-        .empty-state {
-          text-align: center;
-          padding: 3rem 1.5rem;
-          color: var(--text-secondary);
-        }
-
-        .empty-state .material-symbols-outlined {
-          font-size: 3rem;
-          opacity: 0.3;
-          margin-bottom: 1rem;
-        }
-
-        .empty-state p {
-          margin: 0.5rem 0;
-        }
-
-        .empty-state .hint {
-          font-size: 0.875rem;
-          opacity: 0.7;
-        }
-      `}</style>
     </div>
   )
 }
