@@ -136,8 +136,7 @@ export type PortfolioMode = 'paper' | 'live';
 
 export interface GoLiveResponse {
   success: boolean;
-  livePortfolioId: string;
-  message: string;
+  mode: 'live';
 }
 
 // --- Trade Orders ---
@@ -187,7 +186,7 @@ export interface UserRank {
 // --- Achievements ---
 
 export interface Achievement {
-  id: string;
+  id: number;
   name: string;
   description: string;
   icon: string;

@@ -134,12 +134,35 @@ export class PublicSourcesSearchService {
   }
 
   /**
-   * Search SEC filings (placeholder - would integrate with SEC EDGAR API)
+   * Search SEC filings via SEC EDGAR full-text search API
    */
   private async searchSECFilings(ticker: string): Promise<PublicSource[]> {
-    // TODO: Integrate with SEC EDGAR API
-    // For now, return empty array
-    return [];
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const response = await fetch(
+        `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(ticker)}&dateRange=custom&startdt=${ninetyDaysAgo}&enddt=${today}&forms=10-K,10-Q,8-K`,
+        { headers: { 'User-Agent': 'PortfolioRotationAgent/1.0' } }
+      );
+
+      if (!response.ok) return [];
+
+      const data: any = await response.json();
+      const filings = data.hits?.hits || [];
+
+      return filings.slice(0, 3).map((filing: any) => ({
+        type: 'sec_filing' as const,
+        source: 'SEC EDGAR',
+        title: `${filing._source?.form_type || 'Filing'}: ${filing._source?.display_names?.[0] || ticker}`,
+        content: `${filing._source?.form_type || 'SEC Filing'} for ${ticker} filed on ${filing._source?.file_date || 'unknown date'}. ${filing._source?.display_names?.[0] || ''}`,
+        url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${ticker}&type=${filing._source?.form_type || ''}&dateb=&owner=include&count=5`,
+        timestamp: new Date(filing._source?.file_date || Date.now()),
+        relevance: 0.7,
+      }));
+    } catch (error) {
+      console.error(`Failed to search SEC filings for ${ticker}:`, error);
+      return [];
+    }
   }
 
   /**
@@ -187,12 +210,26 @@ export class PublicSourcesSearchService {
   }
 
   /**
-   * Search general market news
+   * Search general market news via Finnhub earnings calendar as a proxy for market activity
    */
   private async searchGeneralNews(query: string): Promise<PublicSource[]> {
-    // TODO: Integrate with news APIs (NewsAPI, AlphaVantage, etc.)
-    // For now, return empty array
-    return [];
+    try {
+      // Use Finnhub earnings calendar for general market activity
+      const calendar = await this.finnhub.getEarningsCalendar();
+      const earnings = calendar?.earningsCalendar || [];
+
+      return earnings.slice(0, 5).map((item: any) => ({
+        type: 'news' as const,
+        source: 'Earnings Calendar',
+        title: `${item.symbol} Earnings: ${item.date}`,
+        content: `${item.symbol} reports earnings on ${item.date}. EPS Estimate: $${item.epsEstimate?.toFixed(2) || 'N/A'}, Revenue Estimate: $${item.revenueEstimate ? (item.revenueEstimate / 1e9).toFixed(2) + 'B' : 'N/A'}`,
+        timestamp: new Date(item.date || Date.now()),
+        relevance: 0.6,
+      }));
+    } catch (error) {
+      console.error('Failed to search general market news:', error);
+      return [];
+    }
   }
 
   /**

@@ -280,7 +280,8 @@ export class UserService {
         sharpeRatio: Math.random() * 3,
         winRate: 40 + Math.random() * 30,
         totalTrades: Math.floor(Math.random() * 50),
-        isCurrentUser: false, // Caller sets this
+        isCurrentUser: false,
+        _userId: row.user_id, // Internal: used by API layer to mark current user
       }));
 
       return { entries: rankedEntries, totalUsers, page, totalPages };

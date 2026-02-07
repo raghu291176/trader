@@ -19,7 +19,10 @@ import { MarketData } from '../data/market_data.js';
 import { clerkMiddleware, requireAuth as clerkRequireAuth } from '@clerk/express';
 
 // Initialize services
-const finnhubService = new FinnhubService(process.env.FINNHUB_API_KEY!);
+if (!process.env.FINNHUB_API_KEY) {
+  console.warn('⚠️  FINNHUB_API_KEY not set — market data endpoints will return empty results');
+}
+const finnhubService = new FinnhubService(process.env.FINNHUB_API_KEY || '');
 const marketData = new MarketData();
 
 // Initialize stock data ingestion service
@@ -38,10 +41,11 @@ if (process.env.DATABASE_URL && process.env.AZURE_OPENAI_API_KEY && process.env.
     }
   );
 
-  // Start continuous ingestion for top stocks (every 15 minutes)
+  // Start continuous ingestion for top stocks (every 15 minutes) — fire-and-forget so server starts regardless
   const topStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX'];
-  await stockDataIngestionService.startContinuousIngestion(topStocks, 15);
-  console.log('✅ Stock data ingestion service started');
+  stockDataIngestionService.startContinuousIngestion(topStocks, 15)
+    .then(() => console.log('✅ Stock data ingestion service started'))
+    .catch((err: Error) => console.warn('⚠️  Stock data ingestion startup failed (non-fatal):', err.message));
 }
 
 // Simple auth helper
@@ -269,8 +273,14 @@ app.post('/api/execute', requireAuth, async (req, res) => {
     const userId = getUserId(req);
     const { ticker, side, shares } = req.body;
 
-    // If explicit trade request (ticker + side + shares), use placeTrade
-    if (ticker && side && shares) {
+    // If explicit trade request (ticker + side + shares), validate and use placeTrade
+    if (ticker && side && shares !== undefined) {
+      if (typeof shares !== 'number' || shares <= 0 || !Number.isFinite(shares)) {
+        return res.status(400).json({ error: 'Shares must be a positive number' });
+      }
+      if (!['buy', 'sell'].includes(side)) {
+        return res.status(400).json({ error: 'Side must be "buy" or "sell"' });
+      }
       const result = await userService.placeTrade(userId, ticker, side, shares);
       return res.json(result);
     }
@@ -761,11 +771,11 @@ app.get('/api/leaderboard', requireAuth, async (req, res) => {
 
     const result = await userService.getLeaderboard(mode, period, page);
 
-    // Mark current user in entries
-    result.entries = result.entries.map((entry: any) => ({
-      ...entry,
-      isCurrentUser: false, // We don't expose user_id in leaderboard rows, but frontend can match by rank
-    }));
+    // Mark current user in entries and strip internal _userId
+    result.entries = result.entries.map((entry: any) => {
+      const { _userId, ...rest } = entry;
+      return { ...rest, isCurrentUser: _userId === userId };
+    });
 
     res.json(result);
   } catch (error) {

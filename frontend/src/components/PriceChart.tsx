@@ -35,11 +35,7 @@ export default function PriceChart({ ticker }: PriceChartProps) {
     try {
       setLoading(true)
       setError(null)
-      const chartData = await fetch(`/api/market/${ticker}/chart?timeframe=${timeframe}`, {
-        headers: {
-          'Authorization': `Bearer ${await apiService['getToken']?.()}`
-        }
-      }).then(res => res.json())
+      const chartData = await apiService.getChartData(ticker, timeframe)
       setData(chartData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load chart')
