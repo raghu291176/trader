@@ -151,3 +151,66 @@ export const stockDataSnapshots = pgTable('stock_data_snapshots', {
 
 export type StockDataSnapshot = typeof stockDataSnapshots.$inferSelect;
 export type NewStockDataSnapshot = typeof stockDataSnapshots.$inferInsert;
+
+/**
+ * User Visibility Settings - leaderboard display preferences
+ */
+export const userVisibility = pgTable('user_visibility', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  showOnLeaderboard: boolean('show_on_leaderboard').default(true).notNull(),
+  displayName: text('display_name'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type UserVisibilityRow = typeof userVisibility.$inferSelect;
+export type NewUserVisibilityRow = typeof userVisibility.$inferInsert;
+
+/**
+ * User Portfolio Mode - tracks paper vs live mode per user
+ */
+export const userPortfolioMode = pgTable('user_portfolio_mode', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(),
+  mode: text('mode').notNull().default('paper'), // 'paper' | 'live'
+  paperCapital: real('paper_capital').default(100000).notNull(),
+  switchedToLiveAt: timestamp('switched_to_live_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type UserPortfolioModeRow = typeof userPortfolioMode.$inferSelect;
+export type NewUserPortfolioModeRow = typeof userPortfolioMode.$inferInsert;
+
+/**
+ * Achievements - badge definitions and user progress
+ */
+export const achievements = pgTable('achievements', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull(),
+  icon: text('icon').notNull(), // Material Symbols icon name
+  category: text('category').notNull(), // Trading, Streak, Social, Risk
+  progressTarget: integer('progress_target').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export type AchievementRow = typeof achievements.$inferSelect;
+export type NewAchievementRow = typeof achievements.$inferInsert;
+
+/**
+ * User Achievements - tracks earned achievements and progress per user
+ */
+export const userAchievements = pgTable('user_achievements', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  achievementId: integer('achievement_id').notNull(),
+  earnedAt: timestamp('earned_at'),
+  progressCurrent: integer('progress_current').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export type UserAchievementRow = typeof userAchievements.$inferSelect;
+export type NewUserAchievementRow = typeof userAchievements.$inferInsert;

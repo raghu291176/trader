@@ -129,3 +129,78 @@ export interface ChatMessage {
   actions?: ChatAction[];
   timestamp?: string;
 }
+
+// --- Paper Trading ---
+
+export type PortfolioMode = 'paper' | 'live';
+
+export interface GoLiveResponse {
+  success: boolean;
+  livePortfolioId: string;
+  message: string;
+}
+
+// --- Trade Orders ---
+
+export interface TradeOrder {
+  ticker: string;
+  side: 'buy' | 'sell';
+  shares: number;
+}
+
+export interface TradeResult {
+  success: boolean;
+  trade?: Trade;
+  message: string;
+}
+
+// --- Leaderboard ---
+
+export type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all_time';
+
+export interface LeaderboardEntry {
+  rank: number;
+  displayName: string;
+  returnPercent: number;
+  sharpeRatio: number;
+  winRate: number;
+  totalTrades: number;
+  isCurrentUser: boolean;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  totalUsers: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface UserRank {
+  rank: number;
+  totalUsers: number;
+  topPercent: number;
+  returnPercent: number;
+  period: LeaderboardPeriod;
+  mode: PortfolioMode;
+}
+
+// --- Achievements ---
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  earnedAt: string | null;
+  progress: number;
+  progressTarget: number;
+  progressCurrent: number;
+}
+
+// --- User Visibility ---
+
+export interface UserVisibility {
+  showOnLeaderboard: boolean;
+  displayName: string;
+}

@@ -2041,3 +2041,777 @@ td strong {
     grid-template-columns: 1fr;
   }
 }
+
+/* ========================================
+   PAPER MODE BANNER
+   ======================================== */
+
+.paper-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 6px var(--space-lg);
+  background: linear-gradient(90deg, rgba(255, 164, 0, 0.12) 0%, rgba(255, 164, 0, 0.06) 100%);
+  border-bottom: 1px solid rgba(255, 164, 0, 0.25);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--warning);
+}
+
+.paper-mode-banner .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.paper-mode-banner__detail {
+  font-weight: 500;
+  opacity: 0.8;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Hero Balance Card - Paper Mode */
+.hero-balance-card--paper {
+  background: linear-gradient(135deg, #5B5FFF 0%, #7C7FFF 60%, rgba(255, 164, 0, 0.3) 100%);
+}
+
+.hero-balance-card__mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 164, 0, 0.25);
+  color: #FFA400;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: var(--space-sm);
+  vertical-align: middle;
+}
+
+.hero-balance-card__mode-badge .material-symbols-outlined {
+  font-size: 12px;
+}
+
+/* ========================================
+   MODE TOGGLE
+   ======================================== */
+
+.mode-toggle {
+  display: inline-flex;
+  background: var(--color-gray-100);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.mode-toggle__btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mode-toggle__btn .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.mode-toggle__btn.active {
+  background: var(--surface-dark);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.mode-toggle__btn:hover:not(.active):not(:disabled) {
+  color: var(--text-primary);
+}
+
+/* ========================================
+   MODAL
+   ======================================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(2px);
+}
+
+.modal-container {
+  background: var(--surface-dark);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-gray-200);
+  box-shadow: var(--shadow-xl);
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+.modal-header h2 {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modal-header .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--primary);
+}
+
+.modal-close {
+  margin-left: auto;
+}
+
+.modal-body {
+  padding: var(--space-xl);
+}
+
+/* ========================================
+   TRADE PANEL
+   ======================================== */
+
+.trade-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.trade-panel__price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trade-panel__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.trade-panel__price {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.trade-panel__stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.trade-panel__stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dark);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.trade-panel__stepper-btn:hover:not(:disabled) {
+  background: var(--color-gray-100);
+  border-color: var(--primary);
+}
+
+.trade-panel__stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.trade-panel__stepper-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.trade-panel__shares-input {
+  flex: 1;
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-panel__shares-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.trade-panel__max-btn {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--color-gray-100);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.trade-panel__max-btn:hover {
+  background: var(--primary-muted);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.trade-panel__info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding: var(--space-sm) 0;
+  border-top: 1px solid var(--color-gray-100);
+}
+
+.trade-panel__summary {
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.trade-panel__summary--buy {
+  background: var(--success-muted);
+  border: 1px solid rgba(0, 211, 149, 0.2);
+}
+
+.trade-panel__summary--sell {
+  background: var(--danger-muted);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+}
+
+.trade-panel__summary-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.trade-panel__summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-panel__summary-detail {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.trade-panel__paper-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 164, 0, 0.08);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.trade-panel__paper-note .material-symbols-outlined {
+  font-size: 14px;
+}
+
+.trade-panel__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--danger-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.trade-panel__error .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.trade-panel__actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.trade-panel__actions .btn-secondary {
+  flex: 1;
+}
+
+.trade-panel__submit {
+  flex: 2;
+  padding: 10px 20px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.trade-panel__submit--buy {
+  background: var(--success);
+}
+
+.trade-panel__submit--buy:hover:not(:disabled) {
+  background: #00b880;
+}
+
+.trade-panel__submit--sell {
+  background: var(--danger);
+}
+
+.trade-panel__submit--sell:hover:not(:disabled) {
+  background: #e63e4e;
+}
+
+.trade-panel__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   LEADERBOARD PAGE
+   ======================================== */
+
+.leaderboard-page {
+  max-width: 900px;
+}
+
+.leaderboard-page h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.leaderboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-lg);
+}
+
+.leaderboard-header .text-muted {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.leaderboard-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--space-lg);
+  background: var(--surface-dark);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-dark);
+  width: fit-content;
+}
+
+.your-rank-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-lg);
+  background: linear-gradient(135deg, rgba(91, 95, 255, 0.06) 0%, rgba(91, 95, 255, 0.02) 100%);
+  border-color: rgba(91, 95, 255, 0.2);
+}
+
+.your-rank-card .material-symbols-outlined {
+  font-size: 28px;
+  color: var(--warning);
+}
+
+.your-rank-card__rank {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.your-rank-card__percentile {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.your-rank-card__return {
+  margin-left: auto;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-row--self {
+  background: rgba(91, 95, 255, 0.04);
+}
+
+.leaderboard-row--self td {
+  font-weight: 600;
+}
+
+.badge-you {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 1px 6px;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  background: var(--primary-muted);
+  color: var(--primary);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.leaderboard-privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: var(--space-lg);
+}
+
+.leaderboard-privacy .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.leaderboard-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* ========================================
+   ACHIEVEMENTS PAGE
+   ======================================== */
+
+.achievements-page {
+  max-width: 900px;
+}
+
+.achievements-page h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.achievements-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.badge-earned-count {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  background: var(--success-muted);
+  color: var(--success);
+  border-radius: var(--radius-sm);
+}
+
+.achievements-filters {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-lg);
+}
+
+.achievement-card {
+  background: var(--surface-dark);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.achievement-card.earned {
+  border-color: rgba(0, 211, 149, 0.3);
+}
+
+.achievement-card.earned:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--success);
+}
+
+.achievement-card.locked {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+
+.achievement-card.locked:hover {
+  opacity: 0.75;
+  filter: grayscale(0.3);
+}
+
+.achievement-card__icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-md);
+  border-radius: 50%;
+  background: var(--primary-muted);
+}
+
+.achievement-card.earned .achievement-card__icon {
+  background: var(--success-muted);
+}
+
+.achievement-card__icon .material-symbols-outlined {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.achievement-card.earned .achievement-card__icon .material-symbols-outlined {
+  color: var(--success);
+}
+
+.achievement-card__name {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.achievement-card__desc {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: var(--space-sm);
+}
+
+.achievement-card__date {
+  font-size: var(--text-xs);
+  color: var(--success);
+  font-weight: 600;
+}
+
+.achievement-card__locked {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.achievement-card__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.achievement-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-gray-200);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.achievement-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.achievement-progress-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .achievements-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .achievements-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ========================================
+   GO LIVE SECTION
+   ======================================== */
+
+.go-live-section {
+  border-color: rgba(255, 164, 0, 0.3);
+  background: linear-gradient(135deg, rgba(255, 164, 0, 0.04) 0%, transparent 100%);
+}
+
+.go-live-description {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+
+.btn-go-live {
+  background: var(--warning) !important;
+}
+
+.btn-go-live:hover {
+  background: #e69400 !important;
+}
+
+.go-live-modal-content p {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+
+.go-live-confirm-field {
+  margin-bottom: var(--space-lg);
+}
+
+.go-live-confirm-field label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.go-live-confirm-field input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.go-live-modal-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+}
+
+.go-live-modal-actions .btn-secondary {
+  flex: 1;
+}
+
+.go-live-modal-actions .btn-primary {
+  flex: 2;
+}
+
+/* ========================================
+   TOGGLE SWITCH
+   ======================================== */
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-gray-300);
+  border-radius: 12px;
+  transition: background var(--transition-fast);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}

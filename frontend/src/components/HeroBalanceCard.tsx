@@ -3,23 +3,35 @@
  * Follows "Invisible Complexity" design philosophy
  */
 
+import type { PortfolioMode } from '../types'
+
 interface HeroBalanceCardProps {
   portfolioValue: number
   dayChange: number
   dayChangePercent: number
+  mode?: PortfolioMode
 }
 
 export default function HeroBalanceCard({
   portfolioValue,
   dayChange,
-  dayChangePercent
+  dayChangePercent,
+  mode
 }: HeroBalanceCardProps) {
   const isPositive = dayChange >= 0
 
   return (
-    <div className="hero-balance-card">
+    <div className={`hero-balance-card ${mode === 'paper' ? 'hero-balance-card--paper' : ''}`}>
       <div className="hero-balance-card__content">
-        <div className="hero-balance-card__label">Portfolio Value</div>
+        <div className="hero-balance-card__label">
+          {mode === 'paper' ? 'Paper Portfolio Value' : 'Portfolio Value'}
+          {mode === 'paper' && (
+            <span className="hero-balance-card__mode-badge">
+              <span className="material-symbols-outlined">science</span>
+              PAPER
+            </span>
+          )}
+        </div>
         <div className="hero-balance-card__value">
           ${portfolioValue.toLocaleString('en-US', {
             minimumFractionDigits: 2,

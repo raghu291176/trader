@@ -262,14 +262,22 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
 });
 
 /**
- * POST /api/execute - Execute rotation decisions (user-specific)
+ * POST /api/execute - Execute trade (explicit buy/sell or auto-rotation)
  */
 app.post('/api/execute', requireAuth, async (req, res) => {
   try {
     const userId = getUserId(req);
+    const { ticker, side, shares } = req.body;
+
+    // If explicit trade request (ticker + side + shares), use placeTrade
+    if (ticker && side && shares) {
+      const result = await userService.placeTrade(userId, ticker, side, shares);
+      return res.json(result);
+    }
+
+    // Otherwise, run auto-rotation (legacy behavior)
     const agent = await userService.getUserAgent(userId);
 
-    // Build comprehensive ticker list: Top 25 + Watchlist + Owned
     const top25 = [
       'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX',
       'BRK.B', 'V', 'JNJ', 'WMT', 'JPM', 'MA', 'PG',
@@ -296,7 +304,7 @@ app.post('/api/execute', requireAuth, async (req, res) => {
         unrealizedPnL: output.performance.unrealizedPnL,
         unrealizedPnLPercent: output.performance.unrealizedPnLPercent,
       },
-      trades: output.trades.slice(-10), // Last 10 trades
+      trades: output.trades.slice(-10),
     });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -696,6 +704,136 @@ app.get('/api/chat/suggestions', requireAuth, async (req, res) => {
     res.status(500).json({ error: (error as Error).message });
   }
 });
+
+// ─── Paper Trading Endpoints ────────────────────────────────
+
+/**
+ * GET /api/portfolio/mode - Get user's current portfolio mode (paper/live)
+ */
+app.get('/api/portfolio/mode', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const result = await userService.getPortfolioMode(userId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/portfolio/paper - Create paper portfolio
+ */
+app.post('/api/portfolio/paper', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const result = await userService.createPaperPortfolio(userId);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/portfolio/go-live - Switch from paper to live trading
+ */
+app.post('/api/portfolio/go-live', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { confirmationText } = req.body;
+    const result = await userService.goLive(userId, confirmationText);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Leaderboard Endpoints ──────────────────────────────────
+
+/**
+ * GET /api/leaderboard - Get leaderboard rankings
+ */
+app.get('/api/leaderboard', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const mode = (req.query.mode as string) || 'paper';
+    const period = (req.query.period as string) || 'monthly';
+    const page = parseInt(req.query.page as string) || 1;
+
+    const result = await userService.getLeaderboard(mode, period, page);
+
+    // Mark current user in entries
+    result.entries = result.entries.map((entry: any) => ({
+      ...entry,
+      isCurrentUser: false, // We don't expose user_id in leaderboard rows, but frontend can match by rank
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/leaderboard/me - Get current user's rank
+ */
+app.get('/api/leaderboard/me', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const mode = (req.query.mode as string) || 'paper';
+    const period = (req.query.period as string) || 'monthly';
+
+    const result = await userService.getUserRank(userId, mode, period);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Achievements Endpoints ─────────────────────────────────
+
+/**
+ * GET /api/achievements/me - Get user's achievements with progress
+ */
+app.get('/api/achievements/me', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const achievements = await userService.getUserAchievements(userId);
+    res.json(achievements);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Visibility Endpoints ───────────────────────────────────
+
+/**
+ * GET /api/user/profile/visibility - Get leaderboard visibility settings
+ */
+app.get('/api/user/profile/visibility', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const visibility = await userService.getVisibility(userId);
+    res.json(visibility);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * PUT /api/user/profile/visibility - Update leaderboard visibility settings
+ */
+app.put('/api/user/profile/visibility', requireAuth, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { showOnLeaderboard, displayName } = req.body;
+    await userService.updateVisibility(userId, { showOnLeaderboard, displayName });
+    res.json({ success: true, message: 'Visibility updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Backtesting Endpoints ──────────────────────────────────
 
 /**
  * POST /api/backtest - Run backtest simulation

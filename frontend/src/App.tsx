@@ -7,12 +7,16 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom'
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { apiService } from './services/api'
+import { PortfolioModeProvider } from './context/PortfolioModeContext'
 import Dashboard from './components/Dashboard'
 import { BacktestForm } from './components/BacktestForm'
 import { BacktestResults } from './components/BacktestResults'
 import StockDetailPage from './pages/StockDetailPage'
 import SettingsPage from './pages/SettingsPage'
+import LeaderboardPage from './pages/LeaderboardPage'
+import AchievementsPage from './pages/AchievementsPage'
 import CustomTickerTape from './components/CustomTickerTape'
+import PaperModeBanner from './components/PaperModeBanner'
 import type { BacktestResult } from './types'
 import './App.css'
 
@@ -60,10 +64,22 @@ function App() {
                 Dashboard
               </Link>
               <Link
+                to="/leaderboard"
+                className={isActive('/leaderboard') ? 'active' : ''}
+              >
+                Leaderboard
+              </Link>
+              <Link
                 to="/backtest"
                 className={isActive('/backtest') ? 'active' : ''}
               >
                 Backtesting
+              </Link>
+              <Link
+                to="/achievements"
+                className={isActive('/achievements') ? 'active' : ''}
+              >
+                Achievements
               </Link>
               <Link
                 to="/settings"
@@ -114,19 +130,24 @@ function App() {
         </SignedOut>
 
         <SignedIn>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/stock/:ticker" element={<StockDetailPage />} />
-            <Route path="/backtest" element={
-              <div className="backtest-tab">
-                <BacktestForm onResults={handleBacktestResults} />
-                {backtestResult && <BacktestResults result={backtestResult} />}
-              </div>
-            } />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <PortfolioModeProvider>
+            <PaperModeBanner />
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/stock/:ticker" element={<StockDetailPage />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/achievements" element={<AchievementsPage />} />
+              <Route path="/backtest" element={
+                <div className="backtest-tab">
+                  <BacktestForm onResults={handleBacktestResults} />
+                  {backtestResult && <BacktestResults result={backtestResult} />}
+                </div>
+              } />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </PortfolioModeProvider>
         </SignedIn>
       </main>
     </div>

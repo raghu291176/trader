@@ -3,7 +3,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import type { Portfolio, Position, Trade, Score, UserProfile, Watchlist } from '../types';
+import type { Portfolio, Position, Trade, Score, UserProfile, Watchlist, PortfolioMode, TradeOrder, TradeResult, LeaderboardResponse, LeaderboardPeriod, UserRank, Achievement, UserVisibility, GoLiveResponse } from '../types';
 
 class ApiService {
   private client: AxiosInstance;
@@ -191,6 +191,65 @@ class ApiService {
   async getChatSuggestions(): Promise<string[]> {
     const { data } = await this.client.get<{ suggestions: string[] }>('/chat/suggestions');
     return data.suggestions;
+  }
+
+  /**
+   * Trade order placement
+   */
+  async placeTrade(order: TradeOrder): Promise<TradeResult> {
+    const { data } = await this.client.post<TradeResult>('/execute', order);
+    return data;
+  }
+
+  /**
+   * Paper trading endpoints
+   */
+  async createPaperPortfolio(): Promise<{ id: string; virtualCapital: number }> {
+    const { data } = await this.client.post('/portfolio/paper');
+    return data;
+  }
+
+  async goLive(confirmationText: string): Promise<GoLiveResponse> {
+    const { data } = await this.client.post<GoLiveResponse>('/portfolio/go-live', { confirmationText });
+    return data;
+  }
+
+  async getPortfolioMode(): Promise<{ mode: PortfolioMode }> {
+    const { data } = await this.client.get<{ mode: PortfolioMode }>('/portfolio/mode');
+    return data;
+  }
+
+  /**
+   * Leaderboard endpoints
+   */
+  async getLeaderboard(mode: PortfolioMode, period: LeaderboardPeriod, page: number = 1): Promise<LeaderboardResponse> {
+    const { data } = await this.client.get<LeaderboardResponse>(`/leaderboard?mode=${mode}&period=${period}&page=${page}`);
+    return data;
+  }
+
+  async getMyRank(mode: PortfolioMode, period: LeaderboardPeriod): Promise<UserRank> {
+    const { data } = await this.client.get<UserRank>(`/leaderboard/me?mode=${mode}&period=${period}`);
+    return data;
+  }
+
+  /**
+   * Achievements endpoints
+   */
+  async getMyAchievements(): Promise<Achievement[]> {
+    const { data } = await this.client.get<Achievement[]>('/achievements/me');
+    return data;
+  }
+
+  /**
+   * User visibility endpoints
+   */
+  async updateVisibility(visibility: UserVisibility): Promise<void> {
+    await this.client.put('/user/profile/visibility', visibility);
+  }
+
+  async getVisibility(): Promise<UserVisibility> {
+    const { data } = await this.client.get<UserVisibility>('/user/profile/visibility');
+    return data;
   }
 }
 
