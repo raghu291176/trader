@@ -66,7 +66,6 @@ export class ChatService {
       azureOpenAIEndpoint: azureConfig.endpoint,
       azureOpenAIApiDeploymentName: azureConfig.deploymentName,
       azureOpenAIApiVersion: azureConfig.apiVersion || '2024-02-15-preview',
-      temperature: 0.7,
     });
     this.marketIntel = new MarketIntelligenceService(azureConfig);
     this.publicSourcesSearch = new PublicSourcesSearchService(finnhubApiKey);

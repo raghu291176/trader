@@ -7,15 +7,18 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiService } from '../services/api'
 import type { Portfolio, Position, Trade, Score, ChatMessage, ChatAction } from '../types'
+import { usePortfolioMode } from '../context/PortfolioModeContext'
 import PoliticianTrades from './PoliticianTrades'
 import CollapsibleCard from './CollapsibleCard'
 import MarketHot from './MarketHot'
 import BiggestMovers from './BiggestMovers'
 import TopMovers from './TopMovers'
 import HeroBalanceCard from './HeroBalanceCard'
+import TradePanel from './TradePanel'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { mode } = usePortfolioMode()
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -27,6 +30,14 @@ export default function Dashboard() {
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatExpanded, setChatExpanded] = useState(false)
+
+  // Trade panel state
+  const [tradeModal, setTradeModal] = useState<{
+    ticker: string
+    side: 'buy' | 'sell'
+    currentPrice: number
+    currentShares?: number
+  } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -71,33 +82,25 @@ export default function Dashboard() {
     }
   }
 
-  async function handleBuyStock(ticker: string) {
-    const shares = prompt(`How many shares of ${ticker} do you want to buy?`)
-    if (!shares || isNaN(Number(shares))) return
-
-    try {
-      setMessage(null)
-      // For now, trigger a rebalance which will analyze and potentially buy
-      // In the future, this could be a direct buy API
-      await apiService.executeRotation()
-      await loadData()
-      setMessage({ type: 'success', text: `Buy order for ${ticker} processed` })
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to buy: ' + (err instanceof Error ? err.message : 'Unknown error') })
-    }
+  function openBuyPanel(ticker: string, currentPrice: number) {
+    setTradeModal({ ticker, side: 'buy', currentPrice })
   }
 
-  async function handleSellStock(ticker: string) {
-    if (!confirm(`Sell all shares of ${ticker}?`)) return
+  function openSellPanel(ticker: string, currentPrice: number, currentShares: number) {
+    setTradeModal({ ticker, side: 'sell', currentPrice, currentShares })
+  }
 
+  async function handleTradeSubmit(order: { ticker: string; side: 'buy' | 'sell'; shares: number }) {
     try {
       setMessage(null)
-      // Trigger rebalance to sell position
-      await apiService.executeRotation()
+      await apiService.placeTrade(order)
       await loadData()
-      setMessage({ type: 'success', text: `Sell order for ${ticker} processed` })
+      setMessage({
+        type: 'success',
+        text: `${order.side === 'buy' ? 'Buy' : 'Sell'} order for ${order.shares} shares of ${order.ticker} processed`
+      })
     } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to sell: ' + (err instanceof Error ? err.message : 'Unknown error') })
+      throw err
     }
   }
 
@@ -129,9 +132,11 @@ export default function Dashboard() {
 
   function handleChatAction(action: ChatAction) {
     if (action.type === 'buy' && action.ticker) {
-      handleBuyStock(action.ticker)
+      const score = scores.find(s => s.ticker === action.ticker)
+      openBuyPanel(action.ticker, score?.currentPrice || 0)
     } else if (action.type === 'sell' && action.ticker) {
-      handleSellStock(action.ticker)
+      const pos = positions.find(p => p.ticker === action.ticker)
+      openSellPanel(action.ticker, pos?.currentPrice || 0, pos?.shares || 0)
     } else if (action.type === 'analyze' && action.ticker) {
       navigate(`/stock/${action.ticker}`)
     } else if (action.type === 'rebalance') {
@@ -152,7 +157,7 @@ export default function Dashboard() {
       {message && (
         <div className={`message ${message.type}`}>
           {message.text}
-          <button onClick={() => setMessage(null)}>×</button>
+          <button onClick={() => setMessage(null)}>&times;</button>
         </div>
       )}
 
@@ -163,6 +168,7 @@ export default function Dashboard() {
             portfolioValue={portfolio.totalValue}
             dayChange={portfolio.unrealizedPnL}
             dayChangePercent={portfolio.unrealizedPnLPercent}
+            mode={mode}
           />
 
           {/* Quick Stats Strip */}
@@ -241,7 +247,7 @@ export default function Dashboard() {
                       </td>
                       <td className="text-right"><strong>{pos.entryScore?.toFixed(2) || 'N/A'}</strong></td>
                       <td>
-                        <button className="btn-sell" onClick={() => handleSellStock(pos.ticker)}>
+                        <button className="btn-sell" onClick={() => openSellPanel(pos.ticker, pos.currentPrice, pos.shares)}>
                           Sell
                         </button>
                       </td>
@@ -324,7 +330,7 @@ export default function Dashboard() {
                         </td>
                         <td>
                           <div className="action-buttons">
-                            <button className="btn-buy" onClick={() => handleBuyStock(score.ticker)}>
+                            <button className="btn-buy" onClick={() => openBuyPanel(score.ticker, score.currentPrice || 0)}>
                               Buy
                             </button>
                             <button className="btn-analyze" onClick={() => navigate(`/stock/${score.ticker}`)}>
@@ -366,7 +372,7 @@ export default function Dashboard() {
                       <span className={trade.type === 'BUY' ? 'positive' : 'negative'}>
                         {trade.ticker}
                       </span>
-                      {' → '}
+                      {' \u2192 '}
                       <span>{trade.type === 'BUY' ? 'Bought' : 'Sold'}</span>
                       {' @ $'}{trade.price.toFixed(2)}
                     </div>
@@ -500,6 +506,20 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Trade Panel Modal */}
+      {tradeModal && portfolio && (
+        <TradePanel
+          isOpen={true}
+          onClose={() => setTradeModal(null)}
+          ticker={tradeModal.ticker}
+          side={tradeModal.side}
+          currentPrice={tradeModal.currentPrice}
+          availableCash={portfolio.cash}
+          currentShares={tradeModal.currentShares}
+          onSubmit={handleTradeSubmit}
+        />
+      )}
     </>
   )
 }

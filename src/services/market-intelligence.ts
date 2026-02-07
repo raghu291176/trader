@@ -1,11 +1,10 @@
 /**
  * Market Intelligence Service
- * Continuously updates RAG database with latest market analysis from major firms
+ * Continuously updates RAG database with latest market analysis from Finnhub
  */
 
 import { Document } from '@langchain/core/documents';
-// MemoryVectorStore removed in langchain v1+ - simplified implementation
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { FinnhubService, FinnhubRecommendation, FinnhubPriceTarget, FinnhubNews } from './finnhub-service.js';
 
 export interface AzureOpenAIConfig {
   apiKey: string;
@@ -42,9 +41,12 @@ export class MarketIntelligenceService {
   private analystReports: AnalystReport[] = [];
   private marketNews: MarketNews[] = [];
   private azureConfig: AzureOpenAIConfig;
+  private finnhub: FinnhubService;
+  private trackedTickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'NFLX'];
 
-  constructor(azureConfig: AzureOpenAIConfig) {
+  constructor(azureConfig: AzureOpenAIConfig, finnhubApiKey?: string) {
     this.azureConfig = azureConfig;
+    this.finnhub = new FinnhubService(finnhubApiKey || '');
   }
 
   /**
@@ -83,7 +85,6 @@ export class MarketIntelligenceService {
       await Promise.all([
         this.fetchAnalystReports(),
         this.fetchMarketNews(),
-        this.fetchSectorAnalysis(),
       ]);
 
       // Rebuild vector store with latest data
@@ -96,77 +97,81 @@ export class MarketIntelligenceService {
   }
 
   /**
-   * Fetch analyst reports from major firms
-   * Sources: Bloomberg, Goldman Sachs, Morgan Stanley, JP Morgan, etc.
+   * Fetch analyst reports from Finnhub for tracked tickers
    */
   private async fetchAnalystReports(): Promise<void> {
-    // TODO: Integrate with real analyst data APIs
-    // For MVP, we'll use placeholder data structure
+    const reports: AnalystReport[] = [];
 
-    const mockReports: AnalystReport[] = [
-      {
-        firm: 'Goldman Sachs',
-        analyst: 'John Doe',
-        ticker: 'NVDA',
-        rating: 'BUY',
-        targetPrice: 850,
-        currentPrice: 725,
-        timestamp: new Date(),
-        summary: 'Strong AI demand driving revenue growth. Raised target from $800 to $850 on datacenter momentum.',
-        catalysts: ['AI chip demand', 'Datacenter expansion', 'New product launches'],
-      },
-      {
-        firm: 'Morgan Stanley',
-        analyst: 'Jane Smith',
-        ticker: 'TSLA',
-        rating: 'UPGRADE',
-        targetPrice: 320,
-        currentPrice: 275,
-        timestamp: new Date(),
-        summary: 'Upgraded to Overweight. FSD adoption accelerating, energy storage business underappreciated.',
-        catalysts: ['FSD licensing revenue', 'Energy storage growth', 'Cybertruck ramp'],
-      },
-    ];
+    // Fetch recommendations and price targets for each tracked ticker
+    for (const ticker of this.trackedTickers) {
+      try {
+        const [recommendations, priceTarget] = await Promise.all([
+          this.finnhub.getRecommendations(ticker),
+          this.finnhub.getPriceTarget(ticker),
+        ]);
 
-    this.analystReports = mockReports;
+        if (recommendations.length > 0 && priceTarget) {
+          const latest = recommendations[0];
+          const total = latest.strongBuy + latest.buy + latest.hold + latest.sell + latest.strongSell;
+          const bullishCount = latest.strongBuy + latest.buy;
+          const bearishCount = latest.sell + latest.strongSell;
+
+          let rating: AnalystReport['rating'] = 'HOLD';
+          if (bullishCount > total * 0.6) rating = 'BUY';
+          else if (bearishCount > total * 0.4) rating = 'SELL';
+
+          const upside = priceTarget.targetMean > 0
+            ? ((priceTarget.targetMean - (priceTarget as any).currentPrice || priceTarget.targetMean * 0.9) / (priceTarget.targetMean * 0.9) * 100)
+            : 0;
+
+          reports.push({
+            firm: 'Finnhub Analyst Consensus',
+            analyst: `${total} analysts`,
+            ticker,
+            rating,
+            targetPrice: priceTarget.targetMean,
+            currentPrice: priceTarget.targetMean * 0.9, // Approximate — real price filled by snapshot
+            timestamp: new Date(latest.period || Date.now()),
+            summary: `${total} analysts covering ${ticker}: ${latest.strongBuy} Strong Buy, ${latest.buy} Buy, ${latest.hold} Hold, ${latest.sell} Sell, ${latest.strongSell} Strong Sell. Mean target $${priceTarget.targetMean.toFixed(2)} (range $${priceTarget.targetLow.toFixed(2)}-$${priceTarget.targetHigh.toFixed(2)}).`,
+            catalysts: [],
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to fetch analyst reports for ${ticker}:`, error);
+      }
+    }
+
+    this.analystReports = reports;
   }
 
   /**
-   * Fetch market news with sentiment analysis
-   * Sources: Bloomberg, Reuters, CNBC, WSJ, MarketWatch
+   * Fetch market news from Finnhub for tracked tickers
    */
   private async fetchMarketNews(): Promise<void> {
-    // TODO: Integrate with news APIs (NewsAPI, Finnhub, AlphaVantage)
-    // For MVP, placeholder structure
+    const allNews: MarketNews[] = [];
 
-    const mockNews: MarketNews[] = [
-      {
-        source: 'Bloomberg',
-        headline: 'Tech Stocks Rally on Strong Q4 Earnings',
-        summary: 'Mega-cap tech names surged after beating earnings estimates, with NVDA up 7% and MSFT up 4%.',
-        tickers: ['NVDA', 'MSFT', 'GOOGL', 'META'],
-        sentiment: 0.8,
-        timestamp: new Date(),
-      },
-      {
-        source: 'Reuters',
-        headline: 'Fed Signals Potential Rate Cuts in 2024',
-        summary: 'Federal Reserve indicated openness to rate cuts if inflation continues to moderate, boosting growth stocks.',
-        tickers: ['SPY', 'QQQ'],
-        sentiment: 0.6,
-        timestamp: new Date(),
-      },
-    ];
+    for (const ticker of this.trackedTickers) {
+      try {
+        const news = await this.finnhub.getNews(ticker);
+        const sentiment = this.finnhub.calculateNewsSentiment(news);
 
-    this.marketNews = mockNews;
-  }
+        for (const item of news.slice(0, 3)) {
+          allNews.push({
+            source: item.source,
+            headline: item.headline,
+            summary: item.summary,
+            tickers: [ticker],
+            sentiment,
+            timestamp: new Date(item.datetime * 1000),
+            url: item.url,
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to fetch news for ${ticker}:`, error);
+      }
+    }
 
-  /**
-   * Fetch sector rotation analysis
-   */
-  private async fetchSectorAnalysis(): Promise<void> {
-    // TODO: Fetch sector rotation data from major research firms
-    // Track institutional money flow between sectors
+    this.marketNews = allNews;
   }
 
   /**
@@ -184,7 +189,7 @@ export class MarketIntelligenceService {
    * Note: Simplified implementation without vector search
    */
   async query(question: string, topK: number = 3): Promise<Document[]> {
-    if (this.analystReports.length === 0 || this.marketNews.length === 0) {
+    if (this.analystReports.length === 0 && this.marketNews.length === 0) {
       await this.updateMarketIntelligence();
     }
 
@@ -228,7 +233,7 @@ export class MarketIntelligenceService {
    * Get market intelligence documents for RAG injection
    */
   async getIntelligenceDocuments(): Promise<Document[]> {
-    if (this.analystReports.length === 0 || this.marketNews.length === 0) {
+    if (this.analystReports.length === 0 && this.marketNews.length === 0) {
       await this.updateMarketIntelligence();
     }
 
