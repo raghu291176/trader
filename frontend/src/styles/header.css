@@ -1,6 +1,7 @@
-/* Header Styles - Redesigned */
+/* Header Styles — Mobile-first, Semantic HTML5 */
 
-.app-header-container {
+/* ── App Header ── */
+.app-header {
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -11,18 +12,19 @@
   box-shadow: var(--shadow-sm);
 }
 
-header {
+.header-inner {
   background: var(--bg-dark);
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+/* ── Header Left (Logo + Hamburger + Nav) ── */
 .header-left {
   display: flex;
   align-items: center;
-  gap: var(--space-2xl);
+  gap: 1rem;
 }
 
 .logo {
@@ -34,6 +36,7 @@ header {
   font-weight: 700;
   font-size: 0.875rem;
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 
 .logo .material-symbols-outlined {
@@ -41,64 +44,109 @@ header {
   font-size: 1.25rem;
 }
 
-nav {
+/* ── Hamburger Button (visible on mobile) ── */
+.mobile-menu-btn {
   display: flex;
-  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
-nav a {
+.mobile-menu-btn:hover {
+  background: var(--surface-dark);
+}
+
+.mobile-menu-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* ── Main Navigation ── */
+/* Mobile: hidden by default, shown as dropdown when open */
+.main-nav {
+  display: none;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-dark);
+  border-bottom: 1px solid var(--border-dark);
+  padding: 0.5rem 1rem;
+  box-shadow: var(--shadow-md);
+  z-index: 999;
+}
+
+.main-nav.open {
+  display: flex;
+}
+
+.main-nav a {
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
   text-decoration: none;
   color: var(--text-secondary);
   border-radius: 0.375rem;
-  transition: all var(--transition-fast);
+  transition: all 0.15s;
   font-size: 0.875rem;
   font-weight: 500;
+  min-height: 44px; /* Touch target */
 }
 
-nav a:hover {
+.main-nav a:hover {
   background: var(--surface-dark);
   color: var(--text-primary);
 }
 
-nav a.active {
+.main-nav a.active {
   background: var(--primary);
   color: white;
   font-weight: 600;
 }
 
-nav a .material-symbols-outlined {
+.main-nav a .material-symbols-outlined {
   font-size: 1.125rem;
 }
 
+/* ── Header Right ── */
 .header-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
+/* ── Search ── */
 .search-container {
   position: relative;
 }
 
 .search-input {
-  width: 200px;
+  width: 140px;
   padding: 0.4rem 0.75rem 0.4rem 2rem;
   background: var(--surface-dark);
   border: 1px solid var(--border-dark);
   border-radius: 0.375rem;
   font-size: 0.8125rem;
   color: var(--text-primary);
-  transition: all var(--transition-fast);
+  transition: all 0.15s;
+  min-height: 36px;
 }
 
 .search-input:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: var(--focus-ring);
+  width: 180px;
 }
 
 .search-input::placeholder {
@@ -115,6 +163,7 @@ nav a .material-symbols-outlined {
   pointer-events: none;
 }
 
+/* ── User Badge ── */
 .user-badge {
   display: flex;
   align-items: center;
@@ -124,7 +173,7 @@ nav a .material-symbols-outlined {
   border: 1px solid var(--border-dark);
   border-radius: 0.375rem;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s;
   font-size: 0.8125rem;
   font-weight: 500;
 }
@@ -138,20 +187,50 @@ nav a .material-symbols-outlined {
   color: var(--text-secondary);
 }
 
-@media (max-width: 768px) {
-  header {
-    padding: 0.5rem 1rem;
+/* ── Tablet: 768px+ ── */
+@media (min-width: 768px) {
+  .header-inner {
+    padding: 0.75rem 1.5rem;
   }
 
   .header-left {
-    gap: 1rem;
+    gap: var(--space-2xl);
   }
 
-  nav {
+  /* Hide hamburger on tablet+ */
+  .mobile-menu-btn {
     display: none;
   }
 
+  /* Show nav inline on tablet+ */
+  .main-nav {
+    display: flex;
+    flex-direction: row;
+    position: static;
+    background: transparent;
+    border-bottom: none;
+    padding: 0;
+    box-shadow: none;
+    gap: 0.25rem;
+  }
+
+  .main-nav a {
+    min-height: unset;
+    padding: 0.5rem 1rem;
+  }
+
   .search-input {
-    width: 180px;
+    width: 200px;
+  }
+
+  .header-right {
+    gap: 0.75rem;
+  }
+}
+
+/* ── Desktop: 1200px+ ── */
+@media (min-width: 1200px) {
+  .search-input {
+    width: 240px;
   }
 }

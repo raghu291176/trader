@@ -49,6 +49,8 @@ export class ChatService {
   private stockDataIngestion: any;
   private initialized = false;
 
+  private twelveData: any;
+
   constructor(
     agent: PortfolioRotationAgent,
     azureConfig: AzureOpenAIConfig,
@@ -56,6 +58,9 @@ export class ChatService {
     finnhubApiKey: string,
     options?: {
       stockDataIngestionService?: any;
+      alphaVantageService?: any;
+      fmpService?: any;
+      twelveDataService?: any;
     }
   ) {
     this.defaultAgent = agent;
@@ -68,11 +73,15 @@ export class ChatService {
       azureOpenAIApiVersion: azureConfig.apiVersion || '2024-02-15-preview',
     });
     this.marketIntel = new MarketIntelligenceService(azureConfig);
-    this.publicSourcesSearch = new PublicSourcesSearchService(finnhubApiKey);
+    this.publicSourcesSearch = new PublicSourcesSearchService(finnhubApiKey, {
+      alphaVantageService: options?.alphaVantageService,
+      fmpService: options?.fmpService,
+    });
     this.finnhub = new FinnhubService(finnhubApiKey);
     this.technicals = new TechnicalIndicatorsService();
     this.marketData = new MarketData();
     this.stockDataIngestion = options?.stockDataIngestionService || null;
+    this.twelveData = options?.twelveDataService || null;
 
     // Initialize politician trades DB if we have a database URL
     try {
@@ -226,26 +235,41 @@ Components:
     const enrichmentPromises = uniqueTickers.map(async (ticker) => {
       const docs: Document[] = [];
 
-      // Technical Analysis
+      // Technical Analysis (prefer Twelve Data for real indicators, fallback to local calculation)
       try {
-        const candles = await this.marketData.fetchCandles(ticker, 30);
-        if (candles.prices.length > 0) {
-          const priceData = candles.prices.map((price: number, i: number) => ({
-            timestamp: candles.dates[i]?.getTime() || Date.now(),
-            open: price,
-            high: price * 1.01,
-            low: price * 0.99,
-            close: price,
-            volume: candles.volumes?.[i] || 0,
-          }));
-          const indicators = this.technicals.calculateAllIndicators(priceData);
-          docs.push(new Document({
-            pageContent: `Technical Analysis for ${ticker}:
+        let indicatorContent = '';
+        if (this.twelveData) {
+          const indicators = await this.twelveData.getIndicatorBundle(ticker);
+          indicatorContent = `Technical Analysis for ${ticker} (Twelve Data):
+- RSI: ${indicators.rsi.value.toFixed(1)} (${indicators.rsi.signal})
+- MACD: ${indicators.macd.macd.toFixed(3)} / Signal: ${indicators.macd.signal.toFixed(3)} (${indicators.macd.trend})
+- Bollinger %B: ${indicators.bollinger.percentB.toFixed(2)}
+- Stochastic: K=${indicators.stochastic.k.toFixed(1)}, D=${indicators.stochastic.d.toFixed(1)} (${indicators.stochastic.signal})
+- ADX: ${indicators.adx?.toFixed(1) || 'N/A'}
+- Overall Trend: ${indicators.trend}, Strength: ${indicators.strength}/100`;
+        } else {
+          const candles = await this.marketData.fetchCandles(ticker, 30);
+          if (candles.prices.length > 0) {
+            const priceData = candles.prices.map((price: number, i: number) => ({
+              timestamp: candles.dates[i]?.getTime() || Date.now(),
+              open: candles.opens?.[i] ?? price,
+              high: candles.highs?.[i] ?? price,
+              low: candles.lows?.[i] ?? price,
+              close: price,
+              volume: candles.volumes?.[i] || 0,
+            }));
+            const indicators = this.technicals.calculateAllIndicators(priceData);
+            indicatorContent = `Technical Analysis for ${ticker}:
 - RSI: ${indicators.rsi.value.toFixed(1)} (${indicators.rsi.signal})
 - MACD: ${indicators.macd.macd.toFixed(3)} / Signal: ${indicators.macd.signal.toFixed(3)} / Histogram: ${indicators.macd.histogram.toFixed(3)} (${indicators.macd.trend})
 - Bollinger Bands: Upper $${indicators.bollinger.upper.toFixed(2)}, Middle $${indicators.bollinger.middle.toFixed(2)}, Lower $${indicators.bollinger.lower.toFixed(2)} (%B: ${indicators.bollinger.percentB.toFixed(2)})
 - Stochastic: K=${indicators.stochastic.k.toFixed(1)}, D=${indicators.stochastic.d.toFixed(1)} (${indicators.stochastic.signal})
-- Overall Trend: ${indicators.trend}, Strength: ${indicators.strength}/100`,
+- Overall Trend: ${indicators.trend}, Strength: ${indicators.strength}/100`;
+          }
+        }
+        if (indicatorContent) {
+          docs.push(new Document({
+            pageContent: indicatorContent,
             metadata: { type: 'technical_analysis', ticker },
           }));
         }

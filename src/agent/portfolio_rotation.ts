@@ -36,14 +36,16 @@ export class PortfolioRotationAgent {
   private scanner: Scanner;
   private scorer: Scorer;
   private rotationEngine: RotationEngine;
+  private fmpService: any;
 
-  constructor(initialCapital: number = 10000) {
+  constructor(initialCapital: number = 10000, options?: { fmpService?: any }) {
     this.portfolio = new Portfolio(initialCapital);
     this.marketData = new MarketData();
     this.watchlistManager = new WatchlistManager();
     this.scanner = new Scanner();
     this.scorer = new Scorer();
     this.rotationEngine = new RotationEngine();
+    this.fmpService = options?.fmpService || null;
   }
 
   /**
@@ -84,14 +86,30 @@ export class PortfolioRotationAgent {
     // Scan for catalysts
     const catalysts = this.scanner.scanMultiple(candlesList);
 
+    // Fetch analyst target prices from FMP if available
+    const targetPrices = new Map<string, number>();
+    if (this.fmpService) {
+      const targetPromises = watchlist.map(async (ticker) => {
+        try {
+          const consensus = await this.fmpService.getPriceTargetConsensus(ticker);
+          if (consensus && consensus.targetConsensus > 0) {
+            targetPrices.set(ticker, consensus.targetConsensus);
+          }
+        } catch { /* skip — scoring works without targets */ }
+      });
+      await Promise.all(targetPromises);
+    }
+
     // Score each ticker
     for (let i = 0; i < candlesList.length; i++) {
       const candles = candlesList[i];
       const catalyst = catalysts[i];
+      const analystTarget = targetPrices.get(candles.ticker);
       const score = this.scorer.scoreTickerWithCandles(
         candles.ticker,
         candles,
-        catalyst
+        catalyst,
+        analystTarget
       );
       scores.set(score.ticker, score.expectedReturn);
     }

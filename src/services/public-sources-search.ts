@@ -17,9 +17,13 @@ export interface PublicSource {
 
 export class PublicSourcesSearchService {
   private finnhub: FinnhubService;
+  private alphaVantage: any;
+  private fmpService: any;
 
-  constructor(finnhubApiKey: string) {
+  constructor(finnhubApiKey: string, options?: { alphaVantageService?: any; fmpService?: any }) {
     this.finnhub = new FinnhubService(finnhubApiKey);
+    this.alphaVantage = options?.alphaVantageService || null;
+    this.fmpService = options?.fmpService || null;
   }
 
   /**
@@ -114,7 +118,7 @@ export class PublicSourcesSearchService {
         });
       }
 
-      // Price target
+      // Price target (Finnhub first, FMP fallback)
       if (priceTarget) {
         results.push({
           type: 'analyst_report',
@@ -124,6 +128,20 @@ export class PublicSourcesSearchService {
           timestamp: new Date(priceTarget.lastUpdated),
           relevance: 0.85,
         });
+      } else if (this.fmpService) {
+        try {
+          const fmpTarget = await this.fmpService.getPriceTargetConsensus(ticker);
+          if (fmpTarget) {
+            results.push({
+              type: 'analyst_report',
+              source: 'FMP Analyst Price Targets',
+              title: `${ticker} Price Target`,
+              content: `Analyst price targets for ${ticker}: Consensus $${fmpTarget.targetConsensus.toFixed(2)}, ranging from $${fmpTarget.targetLow.toFixed(2)} (low) to $${fmpTarget.targetHigh.toFixed(2)} (high).`,
+              timestamp: new Date(),
+              relevance: 0.85,
+            });
+          }
+        } catch { /* skip */ }
       }
 
       return results;
@@ -134,30 +152,21 @@ export class PublicSourcesSearchService {
   }
 
   /**
-   * Search SEC filings via SEC EDGAR full-text search API
+   * Search SEC filings (placeholder - would integrate with SEC EDGAR API)
    */
   private async searchSECFilings(ticker: string): Promise<PublicSource[]> {
+    if (!this.fmpService) return [];
+
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const response = await fetch(
-        `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(ticker)}&dateRange=custom&startdt=${ninetyDaysAgo}&enddt=${today}&forms=10-K,10-Q,8-K`,
-        { headers: { 'User-Agent': 'PortfolioRotationAgent/1.0' } }
-      );
-
-      if (!response.ok) return [];
-
-      const data: any = await response.json();
-      const filings = data.hits?.hits || [];
-
-      return filings.slice(0, 3).map((filing: any) => ({
+      const filings = await this.fmpService.getSECFilings(ticker, undefined, 5);
+      return filings.map((filing: any) => ({
         type: 'sec_filing' as const,
-        source: 'SEC EDGAR',
-        title: `${filing._source?.form_type || 'Filing'}: ${filing._source?.display_names?.[0] || ticker}`,
-        content: `${filing._source?.form_type || 'SEC Filing'} for ${ticker} filed on ${filing._source?.file_date || 'unknown date'}. ${filing._source?.display_names?.[0] || ''}`,
-        url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${ticker}&type=${filing._source?.form_type || ''}&dateb=&owner=include&count=5`,
-        timestamp: new Date(filing._source?.file_date || Date.now()),
-        relevance: 0.7,
+        source: `SEC EDGAR (${filing.type})`,
+        title: `${ticker} ${filing.type} Filing`,
+        content: `${ticker} filed ${filing.type} with the SEC on ${filing.fillingDate}. Accepted: ${filing.acceptedDate}.`,
+        url: filing.finalLink || filing.link,
+        timestamp: new Date(filing.fillingDate),
+        relevance: filing.type === '10-K' || filing.type === '10-Q' ? 0.9 : 0.7,
       }));
     } catch (error) {
       console.error(`Failed to search SEC filings for ${ticker}:`, error);
@@ -210,24 +219,24 @@ export class PublicSourcesSearchService {
   }
 
   /**
-   * Search general market news via Finnhub earnings calendar as a proxy for market activity
+   * Search general market news
    */
   private async searchGeneralNews(query: string): Promise<PublicSource[]> {
-    try {
-      // Use Finnhub earnings calendar for general market activity
-      const calendar = await this.finnhub.getEarningsCalendar();
-      const earnings = calendar?.earningsCalendar || [];
+    if (!this.alphaVantage) return [];
 
-      return earnings.slice(0, 5).map((item: any) => ({
+    try {
+      const newsItems = await this.alphaVantage.getNewsSentiment(undefined, [query]);
+      return newsItems.slice(0, 5).map((item: any) => ({
         type: 'news' as const,
-        source: 'Earnings Calendar',
-        title: `${item.symbol} Earnings: ${item.date}`,
-        content: `${item.symbol} reports earnings on ${item.date}. EPS Estimate: $${item.epsEstimate?.toFixed(2) || 'N/A'}, Revenue Estimate: $${item.revenueEstimate ? (item.revenueEstimate / 1e9).toFixed(2) + 'B' : 'N/A'}`,
-        timestamp: new Date(item.date || Date.now()),
-        relevance: 0.6,
+        source: item.source || 'Alpha Vantage News',
+        title: item.title || '',
+        content: `${item.title}. ${item.summary} (Sentiment: ${item.sentimentLabel}, Score: ${item.overallSentiment.toFixed(2)})`,
+        url: item.url,
+        timestamp: new Date(item.publishedAt),
+        relevance: 0.7,
       }));
     } catch (error) {
-      console.error('Failed to search general market news:', error);
+      console.error('Failed to search general news via Alpha Vantage:', error);
       return [];
     }
   }

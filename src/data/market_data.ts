@@ -21,6 +21,9 @@ export interface CandleData {
   prices: number[];
   volumes: number[];
   dates: Date[];
+  opens?: number[];
+  highs?: number[];
+  lows?: number[];
 }
 
 /**
@@ -62,6 +65,9 @@ export class MarketData {
       const prices: number[] = [];
       const volumes: number[] = [];
       const dates: Date[] = [];
+      const opens: number[] = [];
+      const highs: number[] = [];
+      const lows: number[] = [];
 
       // Extract data from the result
       for (const quote of result) {
@@ -69,6 +75,9 @@ export class MarketData {
           prices.push(quote.close);
           volumes.push(quote.volume);
           dates.push(new Date(quote.date));
+          opens.push(quote.open || quote.close);
+          highs.push(quote.high || quote.close);
+          lows.push(quote.low || quote.close);
         }
       }
 
@@ -77,6 +86,9 @@ export class MarketData {
         prices,
         volumes,
         dates,
+        opens,
+        highs,
+        lows,
       };
 
       // Cache the result

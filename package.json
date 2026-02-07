@@ -6,9 +6,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "dev": "ts-node src/main.ts",
+    "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
-    "server": "ts-node --esm src/server/api.ts",
+    "server": "tsx src/server/api.ts",
     "server:build": "tsc && node dist/server/api.js",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
@@ -44,6 +44,7 @@
     "drizzle-kit": "^0.31.8",
     "prettier": "^3.8.1",
     "ts-node": "^10.9.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }

@@ -1,6 +1,6 @@
 /**
- * Ticker Analysis Modal
- * Shows comprehensive market data, analyst ratings, news, and risk metrics
+ * Ticker Analysis — Semantic HTML5, mobile-first dashboard layout
+ * Uses section/header/aside/figure/ul/time for proper semantics
  */
 
 import { useEffect, useState } from 'react'
@@ -28,14 +28,12 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
     try {
       setLoading(true)
       setError(null)
-      // Use the new snapshot endpoint for real-time data
       const [snapshotData, tradesData, indicatorsData] = await Promise.all([
         apiService.getStockSnapshot(ticker),
         apiService.getPoliticianTradesForTicker(ticker).catch(() => []),
         apiService.getTechnicalIndicators(ticker).catch(() => null)
       ])
 
-      // Transform snapshot data to analysis format
       const analysisData = {
         recommendations: snapshotData.recommendations ? [snapshotData.recommendations] : [],
         priceTarget: snapshotData.priceTarget,
@@ -47,7 +45,6 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
         currentPrice: snapshotData.currentPrice,
         priceChange: snapshotData.priceChange,
         priceChangePercent: snapshotData.priceChangePercent,
-        monthlyHigh: null, // Will be calculated from metrics
       }
 
       setAnalysis(analysisData)
@@ -62,12 +59,12 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
 
   if (loading) {
     if (inline) {
-      return <div className="loading">Loading analysis for {ticker}...</div>
+      return <div className="sd-loading" role="status" aria-live="polite">Loading analysis for {ticker}...</div>
     }
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="loading">Loading analysis for {ticker}...</div>
+          <div className="loading" role="status">Loading analysis for {ticker}...</div>
         </div>
       </div>
     )
@@ -76,7 +73,7 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
   if (error) {
     if (inline) {
       return (
-        <div>
+        <div role="alert">
           <div className="error">Error: {error}</div>
           <button className="btn-primary" onClick={onClose}>Back to Dashboard</button>
         </div>
@@ -85,7 +82,7 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="error">Error: {error}</div>
+          <div className="error" role="alert">Error: {error}</div>
           <button className="btn-primary" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -97,7 +94,6 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
   const recentNews = analysis?.news?.slice(0, 5) || []
   const latestEarnings = analysis?.earnings?.[0]
   const metrics = analysis?.metrics
-  const monthlyHigh = analysis?.monthlyHigh
   const catalysts = analysis?.catalysts || []
 
   const totalRecommendations = latestRec
@@ -112,12 +108,10 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
   const sentimentLabel = sentiment > 0.3 ? 'Positive' : sentiment < -0.3 ? 'Negative' : 'Neutral'
   const sentimentColor = sentiment > 0.3 ? 'positive' : sentiment < -0.3 ? 'negative' : ''
 
-  // Current price from indicators or metrics
   const currentPrice = indicators?.currentPrice || analysis?.currentPrice || metrics?.currentPrice
   const priceChange = indicators?.priceChange || analysis?.priceChange
   const priceChangePercent = indicators?.priceChangePercent || analysis?.priceChangePercent
 
-  // Overall rating
   const overallRating: string = latestRec ?
     (latestRec.strongBuy > 3 || bullishPercent > 70) ? 'Strong Buy' :
     (latestRec.buy > latestRec.hold) ? 'Buy' :
@@ -131,454 +125,321 @@ export default function TickerAnalysis({ ticker, onClose, inline = false }: Tick
 
   const analysisContent = (
     <>
-      {/* Header */}
+      {/* Modal header (non-inline only) */}
       {!inline && (
         <div className="modal-header">
-          <h2>
-            <strong>{ticker}</strong> Analysis
-          </h2>
-          <button className="icon-btn" onClick={onClose}>
+          <h2><strong>{ticker}</strong> Analysis</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="Close analysis">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
       )}
 
-        {/* Price & Rating Summary */}
-        <div className="ticker-summary">
-          <div className="price-section">
-            <label>Current Price</label>
-            <div className="current-price">
-              {currentPrice ? `$${currentPrice.toFixed(2)}` : 'Loading...'}
-            </div>
-            {priceChange !== undefined && priceChangePercent !== undefined && (
-              <div className={`price-change ${priceChange >= 0 ? 'positive' : 'negative'}`}>
-                <span className="material-symbols-outlined">
-                  {priceChange >= 0 ? 'arrow_upward' : 'arrow_downward'}
-                </span>
-                {priceChange >= 0 ? '+' : ''}${Math.abs(priceChange).toFixed(2)}
-                ({priceChange >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
-              </div>
-            )}
-          </div>
-          <div className="rating-section">
-            <label>Analyst Consensus</label>
-            <div className={`overall-rating ${ratingClass}`}>
-              {overallRating}
-            </div>
-            {latestRec && (
-              <div className="rating-count">
-                {totalRecommendations} analysts • {bullishPercent.toFixed(0)}% bullish
-              </div>
-            )}
-          </div>
-          {priceTarget && (
-            <div className="target-section">
-              <label>12-Month Target</label>
-              <div className="target-price">${priceTarget.targetMean?.toFixed(2)}</div>
-              <div className="target-range">
-                ${priceTarget.targetLow?.toFixed(2)} - ${priceTarget.targetHigh?.toFixed(2)}
-              </div>
-            </div>
+      {/* ── TOP BAR: Ticker + Price + Rating + Target ── */}
+      <header className="sd-topbar">
+        <div className="sd-topbar-ticker">
+          <h1 className="sd-ticker-symbol">{ticker}</h1>
+          <span className={`sd-topbar-rating ${ratingClass}`} role="status">{overallRating}</span>
+        </div>
+        <div className="sd-topbar-price">
+          <span className="sd-price-value">
+            {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
+          </span>
+          {priceChange !== undefined && priceChangePercent !== undefined && (
+            <span className={`sd-price-change ${priceChange >= 0 ? 'positive' : 'negative'}`}>
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                {priceChange >= 0 ? 'arrow_upward' : 'arrow_downward'}
+              </span>
+              {priceChange >= 0 ? '+' : ''}${Math.abs(priceChange).toFixed(2)}
+              ({priceChange >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+            </span>
           )}
         </div>
+        <div className="sd-topbar-stats">
+          {priceTarget && (
+            <div className="sd-topbar-stat">
+              <label>Target</label>
+              <span>${priceTarget.targetMean?.toFixed(2)}</span>
+            </div>
+          )}
+          {metrics?.marketCapitalization && (
+            <div className="sd-topbar-stat">
+              <label>Mkt Cap</label>
+              <span>${(metrics.marketCapitalization / 1000).toFixed(1)}B</span>
+            </div>
+          )}
+          {metrics?.['52WeekHigh'] && (
+            <div className="sd-topbar-stat">
+              <label>52W H/L</label>
+              <span>${metrics['52WeekHigh'].toFixed(0)} / ${metrics['52WeekLow']?.toFixed(0)}</span>
+            </div>
+          )}
+          <div className="sd-topbar-stat">
+            <label>Sentiment</label>
+            <span className={sentimentColor}>{sentimentLabel}</span>
+          </div>
+        </div>
+      </header>
 
-        <div className="modal-body">
-          {/* Price Chart */}
-          <section className="analysis-section">
-            <h3>
-              <span className="material-symbols-outlined">show_chart</span>
-              Price History
-            </h3>
+      {/* ── MAIN GRID: Chart left + Cards right ── */}
+      <div className="sd-main-grid">
+        {/* Left column: Chart + Indicators */}
+        <div className="sd-col-chart">
+          <figure className="sd-panel" aria-label={`${ticker} price chart`}>
             <PriceChart ticker={ticker} />
-          </section>
+          </figure>
 
           {/* Technical Indicators */}
           {indicators && (
-            <section className="analysis-section">
-              <h3>
+            <section className="sd-panel" aria-label="Technical indicators">
+              <header className="sd-panel-header">
                 <span className="material-symbols-outlined">analytics</span>
                 Technical Indicators
-              </h3>
-              <div className="indicators-grid">
-                {/* RSI */}
-                <div className="indicator-card">
-                  <div className="indicator-header">
-                    <label>RSI (14)</label>
-                    <span className={`indicator-badge ${indicators.rsi.signal === 'overbought' ? 'badge-negative' : indicators.rsi.signal === 'oversold' ? 'badge-positive' : 'badge-neutral'}`}>
-                      {indicators.rsi.signal.charAt(0).toUpperCase() + indicators.rsi.signal.slice(1)}
-                    </span>
-                  </div>
-                  <div className="indicator-value">{indicators.rsi.value.toFixed(2)}</div>
-                  <div className="indicator-bar">
-                    <div className="indicator-fill" style={{ width: `${indicators.rsi.value}%`, background: indicators.rsi.value > 70 ? 'var(--rose)' : indicators.rsi.value < 30 ? 'var(--emerald)' : 'var(--primary)' }}></div>
-                  </div>
-                </div>
-
-                {/* MACD */}
-                <div className="indicator-card">
-                  <div className="indicator-header">
-                    <label>MACD</label>
-                    <span className={`indicator-badge ${indicators.macd.trend === 'bullish' ? 'badge-positive' : indicators.macd.trend === 'bearish' ? 'badge-negative' : 'badge-neutral'}`}>
-                      {indicators.macd.trend.charAt(0).toUpperCase() + indicators.macd.trend.slice(1)}
-                    </span>
-                  </div>
-                  <div className="indicator-value">{indicators.macd.histogram.toFixed(3)}</div>
-                  <div className="indicator-details">
-                    <span>MACD: {indicators.macd.macd.toFixed(2)}</span>
-                    <span>Signal: {indicators.macd.signal.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Bollinger Bands */}
-                <div className="indicator-card">
-                  <div className="indicator-header">
-                    <label>Bollinger Bands</label>
-                    <span className="indicator-badge badge-neutral">
-                      %B: {(indicators.bollinger.percentB * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="indicator-value">${indicators.bollinger.middle.toFixed(2)}</div>
-                  <div className="indicator-details">
-                    <span>Upper: ${indicators.bollinger.upper.toFixed(2)}</span>
-                    <span>Lower: ${indicators.bollinger.lower.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Stochastic */}
-                <div className="indicator-card">
-                  <div className="indicator-header">
-                    <label>Stochastic (14,3)</label>
-                    <span className={`indicator-badge ${indicators.stochastic.signal === 'overbought' ? 'badge-negative' : indicators.stochastic.signal === 'oversold' ? 'badge-positive' : 'badge-neutral'}`}>
-                      {indicators.stochastic.signal.charAt(0).toUpperCase() + indicators.stochastic.signal.slice(1)}
-                    </span>
-                  </div>
-                  <div className="indicator-value">{indicators.stochastic.k.toFixed(2)}</div>
-                  <div className="indicator-details">
-                    <span>%K: {indicators.stochastic.k.toFixed(1)}</span>
-                    <span>%D: {indicators.stochastic.d.toFixed(1)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Overall Trend */}
-              <div className="trend-summary">
-                <div className="trend-label">Overall Trend:</div>
-                <div className={`trend-value ${indicators.trend === 'bullish' ? 'positive' : indicators.trend === 'bearish' ? 'negative' : ''}`}>
-                  <span className="material-symbols-outlined">
+                <span className={`sd-trend-badge ${indicators.trend === 'bullish' ? 'positive' : indicators.trend === 'bearish' ? 'negative' : ''}`}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
                     {indicators.trend === 'bullish' ? 'trending_up' : indicators.trend === 'bearish' ? 'trending_down' : 'trending_flat'}
                   </span>
-                  {indicators.trend.charAt(0).toUpperCase() + indicators.trend.slice(1)}
+                  {indicators.trend.charAt(0).toUpperCase() + indicators.trend.slice(1)} ({indicators.strength.toFixed(0)}%)
+                </span>
+              </header>
+              <div className="sd-indicators-row">
+                <div className="sd-ind-chip">
+                  <label>RSI</label>
+                  <span className={indicators.rsi.signal === 'overbought' ? 'negative' : indicators.rsi.signal === 'oversold' ? 'positive' : ''}>{indicators.rsi.value.toFixed(1)}</span>
+                  <small>{indicators.rsi.signal}</small>
                 </div>
-                <div className="trend-strength">
-                  <label>Strength: {indicators.strength.toFixed(0)}%</label>
-                  <div className="strength-bar">
-                    <div className="strength-fill" style={{ width: `${indicators.strength}%` }}></div>
-                  </div>
+                <div className="sd-ind-chip">
+                  <label>MACD</label>
+                  <span className={indicators.macd.trend === 'bullish' ? 'positive' : indicators.macd.trend === 'bearish' ? 'negative' : ''}>{indicators.macd.histogram.toFixed(3)}</span>
+                  <small>{indicators.macd.trend}</small>
                 </div>
-              </div>
-            </section>
-          )}
-
-          {/* Price Statistics */}
-          {(metrics || monthlyHigh) && (
-            <section className="analysis-section">
-              <h3>
-                <span className="material-symbols-outlined">trending_up</span>
-                Price Statistics
-              </h3>
-              <div className="price-stats-grid">
-                {monthlyHigh && (
-                  <div className="stat-box">
-                    <label>Monthly High (30D)</label>
-                    <div className="value positive">${monthlyHigh.price.toFixed(2)}</div>
-                    <div className="date">{new Date(monthlyHigh.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                  </div>
-                )}
-                {metrics && metrics['52WeekHigh'] && (
-                  <div className="stat-box">
-                    <label>52-Week High</label>
-                    <div className="value positive">${metrics['52WeekHigh'].toFixed(2)}</div>
-                    {metrics['52WeekHighDate'] && (
-                      <div className="date">{new Date(metrics['52WeekHighDate']).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                    )}
-                  </div>
-                )}
-                {metrics && metrics['52WeekLow'] && (
-                  <div className="stat-box">
-                    <label>52-Week Low</label>
-                    <div className="value negative">${metrics['52WeekLow'].toFixed(2)}</div>
-                    {metrics['52WeekLowDate'] && (
-                      <div className="date">{new Date(metrics['52WeekLowDate']).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                    )}
-                  </div>
-                )}
-                {metrics && metrics.marketCapitalization && (
-                  <div className="stat-box">
-                    <label>Market Cap</label>
-                    <div className="value">${(metrics.marketCapitalization / 1000).toFixed(2)}B</div>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* Price Catalysts */}
-          {catalysts.length > 0 && (
-            <section className="analysis-section">
-              <h3>
-                <span className="material-symbols-outlined">bolt</span>
-                Price Catalysts
-              </h3>
-              <div className="catalysts-list">
-                {catalysts.map((catalyst: any, idx: number) => (
-                  <div key={idx} className={`catalyst-item ${catalyst.impact}`}>
-                    <div className="catalyst-icon">
-                      <span className="material-symbols-outlined">
-                        {catalyst.type === 'earnings' ? 'account_balance' :
-                         catalyst.type === 'upgrade' ? 'trending_up' :
-                         catalyst.type === 'downgrade' ? 'trending_down' :
-                         'newspaper'}
-                      </span>
-                    </div>
-                    <div className="catalyst-content">
-                      <div className="catalyst-type">
-                        <span className={`badge badge-${catalyst.impact}`}>
-                          {catalyst.type === 'earnings' ? 'Earnings' :
-                           catalyst.type === 'upgrade' ? 'Upgrade' :
-                           catalyst.type === 'downgrade' ? 'Downgrade' :
-                           'News'}
-                        </span>
-                      </div>
-                      <div className="catalyst-description">{catalyst.description}</div>
-                      <div className="catalyst-date">
-                        {new Date(catalyst.date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </div>
-                    </div>
-                    <div className={`catalyst-impact ${catalyst.impact}`}>
-                      <span className="material-symbols-outlined">
-                        {catalyst.impact === 'positive' ? 'arrow_upward' :
-                         catalyst.impact === 'negative' ? 'arrow_downward' :
-                         'remove'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Analyst Ratings */}
-          <section className="analysis-section">
-            <h3>
-              <span className="material-symbols-outlined">insights</span>
-              Analyst Ratings
-            </h3>
-            {latestRec ? (
-              <div className="analyst-ratings">
-                <div className="ratings-summary">
-                  <div className="rating-bar">
-                    <div className="rating-segment buy" style={{ width: `${((latestRec.strongBuy + latestRec.buy) / totalRecommendations) * 100}%` }}></div>
-                    <div className="rating-segment hold" style={{ width: `${(latestRec.hold / totalRecommendations) * 100}%` }}></div>
-                    <div className="rating-segment sell" style={{ width: `${((latestRec.sell + latestRec.strongSell) / totalRecommendations) * 100}%` }}></div>
-                  </div>
-                  <div className="rating-labels">
-                    <div className="rating-item">
-                      <span className="badge badge-up">Strong Buy: {latestRec.strongBuy}</span>
-                    </div>
-                    <div className="rating-item">
-                      <span className="badge badge-vol">Buy: {latestRec.buy}</span>
-                    </div>
-                    <div className="rating-item">
-                      <span className="badge badge-cat">Hold: {latestRec.hold}</span>
-                    </div>
-                    <div className="rating-item">
-                      <span className="badge badge-rsi">Sell: {latestRec.sell}</span>
-                    </div>
-                    <div className="rating-item">
-                      <span className="badge warning">Strong Sell: {latestRec.strongSell}</span>
-                    </div>
-                  </div>
-                  <div className="consensus">
-                    <strong>{bullishPercent.toFixed(0)}% Bullish</strong> ({totalRecommendations} analysts)
-                  </div>
+                <div className="sd-ind-chip">
+                  <label>Bollinger %B</label>
+                  <span>{(indicators.bollinger.percentB * 100).toFixed(0)}%</span>
+                  <small>${indicators.bollinger.middle.toFixed(0)}</small>
                 </div>
-              </div>
-            ) : (
-              <p className="empty-small">No analyst ratings available</p>
-            )}
-          </section>
-
-          {/* Price Target */}
-          {priceTarget && (
-            <section className="analysis-section">
-              <h3>
-                <span className="material-symbols-outlined">target</span>
-                Price Target
-              </h3>
-              <div className="price-targets">
-                <div className="price-item">
-                  <label>Target High</label>
-                  <div className="value positive">${priceTarget.targetHigh?.toFixed(2)}</div>
+                <div className="sd-ind-chip">
+                  <label>Stochastic</label>
+                  <span className={indicators.stochastic.signal === 'overbought' ? 'negative' : indicators.stochastic.signal === 'oversold' ? 'positive' : ''}>{indicators.stochastic.k.toFixed(1)}</span>
+                  <small>{indicators.stochastic.signal}</small>
                 </div>
-                <div className="price-item">
-                  <label>Target Mean</label>
-                  <div className="value">${priceTarget.targetMean?.toFixed(2)}</div>
-                </div>
-                <div className="price-item">
-                  <label>Target Low</label>
-                  <div className="value negative">${priceTarget.targetLow?.toFixed(2)}</div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Earnings */}
-          {latestEarnings && (
-            <section className="analysis-section">
-              <h3>
-                <span className="material-symbols-outlined">account_balance</span>
-                Latest Earnings
-              </h3>
-              <div className="earnings-data">
-                <div className="earnings-item">
-                  <label>Period</label>
-                  <div>{latestEarnings.period} Q{latestEarnings.quarter} {latestEarnings.year}</div>
-                </div>
-                <div className="earnings-item">
-                  <label>Actual</label>
-                  <div className={latestEarnings.actual > latestEarnings.estimate ? 'positive' : 'negative'}>
-                    ${latestEarnings.actual?.toFixed(2)}
-                  </div>
-                </div>
-                <div className="earnings-item">
-                  <label>Estimate</label>
-                  <div>${latestEarnings.estimate?.toFixed(2)}</div>
-                </div>
-                <div className="earnings-item">
-                  <label>Surprise</label>
-                  <div className={latestEarnings.surprise > 0 ? 'positive' : 'negative'}>
-                    {latestEarnings.surprise > 0 ? '+' : ''}{latestEarnings.surprisePercent?.toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* News & Sentiment */}
-          <section className="analysis-section">
-            <h3>
-              <span className="material-symbols-outlined">newspaper</span>
-              Recent News & Sentiment
-            </h3>
-            <div className="sentiment-indicator">
-              <label>Market Sentiment:</label>
-              <span className={`sentiment-badge ${sentimentColor}`}>
-                {sentimentLabel} ({sentiment > 0 ? '+' : ''}{sentiment.toFixed(2)})
-              </span>
-            </div>
-            {recentNews.length > 0 ? (
-              <div className="news-list">
-                {recentNews.map((item: any, idx: number) => (
-                  <div key={idx} className="news-item">
-                    <div className="news-source">{item.source}</div>
-                    <div className="news-headline">{item.headline}</div>
-                    <div className="news-date">
-                      {new Date(item.datetime * 1000).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="empty-small">No recent news available</p>
-            )}
-          </section>
-
-          {/* Risk Metrics */}
-          <section className="analysis-section">
-            <h3>
-              <span className="material-symbols-outlined">warning</span>
-              Risk Assessment
-            </h3>
-            <div className="risk-metrics">
-              <div className="risk-item">
-                <label>Volatility Risk</label>
-                <div className="risk-bar">
-                  <div className="risk-fill medium" style={{ width: '60%' }}></div>
-                </div>
-                <span className="risk-label">Medium</span>
-              </div>
-              <div className="risk-item">
-                <label>Analyst Consensus Risk</label>
-                <div className="risk-bar">
-                  <div className="risk-fill low" style={{ width: `${100 - bullishPercent}%` }}></div>
-                </div>
-                <span className="risk-label">{100 - bullishPercent > 50 ? 'High' : bullishPercent > 70 ? 'Low' : 'Medium'}</span>
-              </div>
-              <div className="risk-item">
-                <label>Sentiment Risk</label>
-                <div className="risk-bar">
-                  <div className="risk-fill low" style={{ width: `${Math.abs(sentiment) * 50}%` }}></div>
-                </div>
-                <span className="risk-label">{Math.abs(sentiment) > 0.5 ? 'High' : 'Low'}</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Politician Holdings */}
-          {politicianTrades.length > 0 && (
-            <section className="analysis-section">
-              <h3>
-                <span className="material-symbols-outlined">gavel</span>
-                Congressional Trades
-              </h3>
-              <div className="politician-trades-list">
-                {politicianTrades.slice(0, 5).map((trade: any, idx: number) => (
-                  <div key={idx} className="politician-trade-item">
-                    <div className="trade-politician">
-                      <div className="politician-name">{trade.politician || trade.politicianName}</div>
-                      <div className="politician-info">
-                        <span className="party-badge">{trade.party}</span>
-                        <span className="chamber-badge">{trade.chamber}</span>
-                      </div>
-                    </div>
-                    <div className="trade-details">
-                      <div className={`trade-type ${trade.tradeType === 'Purchase' || trade.tradeType === 'purchase' ? 'buy' : 'sell'}`}>
-                        {trade.tradeType || trade.trade_type}
-                      </div>
-                      <div className="trade-amount">${trade.amountRange?.min?.toLocaleString() || trade.amount_min?.toLocaleString()} - ${trade.amountRange?.max?.toLocaleString() || trade.amount_max?.toLocaleString()}</div>
-                      <div className="trade-date">
-                        {new Date(trade.transactionDate || trade.transaction_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </section>
           )}
         </div>
 
-        {!inline && (
-          <div className="modal-footer">
-            <button className="btn-secondary" onClick={onClose}>Close</button>
-          </div>
-        )}
+        {/* Right column: Compact info cards */}
+        <aside className="sd-col-info" aria-label="Stock details">
+          {/* Analyst Ratings */}
+          <section className="sd-panel sd-panel-compact" aria-label="Analyst ratings">
+            <header className="sd-panel-header">
+              <span className="material-symbols-outlined">insights</span>
+              Analyst Ratings
+            </header>
+            {latestRec ? (
+              <>
+                <div className="sd-rating-bar-row">
+                  <div className="sd-rating-bar" role="meter" aria-label="Bullish percentage" aria-valuenow={bullishPercent} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="sd-bar-buy" style={{ width: `${((latestRec.strongBuy + latestRec.buy) / totalRecommendations) * 100}%` }}></div>
+                    <div className="sd-bar-hold" style={{ width: `${(latestRec.hold / totalRecommendations) * 100}%` }}></div>
+                    <div className="sd-bar-sell" style={{ width: `${((latestRec.sell + latestRec.strongSell) / totalRecommendations) * 100}%` }}></div>
+                  </div>
+                  <span className="sd-rating-pct">{bullishPercent.toFixed(0)}% Bull</span>
+                </div>
+                <div className="sd-rating-chips">
+                  <span className="sd-chip positive">SB {latestRec.strongBuy}</span>
+                  <span className="sd-chip positive">B {latestRec.buy}</span>
+                  <span className="sd-chip">H {latestRec.hold}</span>
+                  <span className="sd-chip negative">S {latestRec.sell}</span>
+                  <span className="sd-chip negative">SS {latestRec.strongSell}</span>
+                </div>
+              </>
+            ) : (
+              <p className="sd-empty">No ratings available</p>
+            )}
+          </section>
+
+          {/* Price Targets */}
+          {priceTarget && (
+            <section className="sd-panel sd-panel-compact" aria-label="Price target">
+              <header className="sd-panel-header">
+                <span className="material-symbols-outlined">target</span>
+                Price Target
+              </header>
+              <div className="sd-target-row">
+                <div className="sd-target-item">
+                  <label>Low</label>
+                  <span className="negative">${priceTarget.targetLow?.toFixed(2)}</span>
+                </div>
+                <div className="sd-target-item sd-target-mean">
+                  <label>Mean</label>
+                  <span>${priceTarget.targetMean?.toFixed(2)}</span>
+                </div>
+                <div className="sd-target-item">
+                  <label>High</label>
+                  <span className="positive">${priceTarget.targetHigh?.toFixed(2)}</span>
+                </div>
+              </div>
+              {currentPrice && priceTarget.targetMean && (
+                <div className="sd-upside">
+                  <span className={priceTarget.targetMean > currentPrice ? 'positive' : 'negative'}>
+                    {((priceTarget.targetMean - currentPrice) / currentPrice * 100).toFixed(1)}% upside
+                  </span>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Latest Earnings */}
+          {latestEarnings && (
+            <section className="sd-panel sd-panel-compact" aria-label="Latest earnings">
+              <header className="sd-panel-header">
+                <span className="material-symbols-outlined">account_balance</span>
+                Earnings Q{latestEarnings.quarter} {latestEarnings.year}
+              </header>
+              <div className="sd-earnings-row">
+                <div>
+                  <label>Actual</label>
+                  <span className={latestEarnings.actual > latestEarnings.estimate ? 'positive' : 'negative'}>
+                    ${latestEarnings.actual?.toFixed(2)}
+                  </span>
+                </div>
+                <div>
+                  <label>Est</label>
+                  <span>${latestEarnings.estimate?.toFixed(2)}</span>
+                </div>
+                <div>
+                  <label>Surprise</label>
+                  <span className={latestEarnings.surprise > 0 ? 'positive' : 'negative'}>
+                    {latestEarnings.surprise > 0 ? '+' : ''}{latestEarnings.surprisePercent?.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Risk Assessment */}
+          <section className="sd-panel sd-panel-compact" aria-label="Risk assessment">
+            <header className="sd-panel-header">
+              <span className="material-symbols-outlined">warning</span>
+              Risk
+            </header>
+            <div className="sd-risk-rows">
+              <div className="sd-risk-row">
+                <label>Volatility</label>
+                <div className="sd-risk-bar" role="meter" aria-valuenow={60} aria-valuemin={0} aria-valuemax={100}><div className="sd-risk-fill medium" style={{ width: '60%' }}></div></div>
+                <span>Med</span>
+              </div>
+              <div className="sd-risk-row">
+                <label>Consensus</label>
+                <div className="sd-risk-bar" role="meter" aria-valuenow={100 - bullishPercent} aria-valuemin={0} aria-valuemax={100}><div className={`sd-risk-fill ${100 - bullishPercent > 50 ? 'high' : bullishPercent > 70 ? 'low' : 'medium'}`} style={{ width: `${100 - bullishPercent}%` }}></div></div>
+                <span>{100 - bullishPercent > 50 ? 'High' : bullishPercent > 70 ? 'Low' : 'Med'}</span>
+              </div>
+              <div className="sd-risk-row">
+                <label>Sentiment</label>
+                <div className="sd-risk-bar" role="meter" aria-valuenow={Math.abs(sentiment) * 100} aria-valuemin={0} aria-valuemax={100}><div className={`sd-risk-fill ${Math.abs(sentiment) > 0.5 ? 'high' : 'low'}`} style={{ width: `${Math.max(Math.abs(sentiment) * 80, 10)}%` }}></div></div>
+                <span>{Math.abs(sentiment) > 0.5 ? 'High' : 'Low'}</span>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      {/* ── BOTTOM GRID: News + Catalysts + Congressional ── */}
+      <div className="sd-bottom-grid">
+        {/* News */}
+        <section className="sd-panel" aria-label="News and sentiment">
+          <header className="sd-panel-header">
+            <span className="material-symbols-outlined">newspaper</span>
+            News &amp; Sentiment
+            <span className={`sd-sentiment-chip ${sentimentColor}`}>
+              {sentimentLabel} ({sentiment > 0 ? '+' : ''}{sentiment.toFixed(2)})
+            </span>
+          </header>
+          {recentNews.length > 0 ? (
+            <ul className="sd-news-list">
+              {recentNews.map((item: any, idx: number) => (
+                <li key={idx} className="sd-news-item">
+                  <div className="sd-news-meta">
+                    <span className="sd-news-source">{item.source}</span>
+                    <time className="sd-news-date" dateTime={new Date(item.datetime * 1000).toISOString()}>
+                      {new Date(item.datetime * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </time>
+                  </div>
+                  <div className="sd-news-headline">{item.headline}</div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="sd-empty">No recent news</p>
+          )}
+        </section>
+
+        {/* Catalysts + Congressional in one column */}
+        <div className="sd-bottom-right">
+          {catalysts.length > 0 && (
+            <section className="sd-panel" aria-label="Catalysts">
+              <header className="sd-panel-header">
+                <span className="material-symbols-outlined">bolt</span>
+                Catalysts
+              </header>
+              <ul className="sd-catalysts-list">
+                {catalysts.slice(0, 4).map((c: any, idx: number) => (
+                  <li key={idx} className={`sd-catalyst ${c.impact}`}>
+                    <span className={`sd-catalyst-badge ${c.impact}`}>
+                      {c.type === 'earnings' ? 'Earn' : c.type === 'upgrade' ? 'Up' : c.type === 'downgrade' ? 'Down' : 'News'}
+                    </span>
+                    <span className="sd-catalyst-text">{c.description}</span>
+                    <time className="sd-catalyst-date" dateTime={new Date(c.date).toISOString()}>
+                      {new Date(c.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {politicianTrades.length > 0 && (
+            <section className="sd-panel" aria-label="Congressional trades">
+              <header className="sd-panel-header">
+                <span className="material-symbols-outlined">gavel</span>
+                Congressional Trades
+              </header>
+              <ul className="sd-congress-list">
+                {politicianTrades.slice(0, 4).map((trade: any, idx: number) => (
+                  <li key={idx} className="sd-congress-item">
+                    <div className="sd-congress-left">
+                      <span className="sd-congress-name">{trade.politician || trade.politicianName}</span>
+                      <span className="sd-congress-meta">
+                        {trade.party} · {trade.chamber}
+                      </span>
+                    </div>
+                    <div className="sd-congress-right">
+                      <span className={`sd-congress-type ${trade.tradeType === 'Purchase' || trade.tradeType === 'purchase' ? 'buy' : 'sell'}`}>
+                        {trade.tradeType || trade.trade_type}
+                      </span>
+                      <time className="sd-congress-date" dateTime={new Date(trade.transactionDate || trade.transaction_date).toISOString()}>
+                        {new Date(trade.transactionDate || trade.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
+
+      {!inline && (
+        <footer className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Close</button>
+        </footer>
+      )}
     </>
   )
 
   if (inline) {
-    return <div className="ticker-analysis-inline">{analysisContent}</div>
+    return <div className="sd-page">{analysisContent}</div>
   }
 
   return (

@@ -90,6 +90,10 @@ export class FinnhubService {
     try {
       const response = await fetch(url);
       if (!response.ok) {
+        // 403 is expected on Finnhub free tier — price-target is a premium endpoint
+        if (response.status === 403) {
+          return null;
+        }
         throw new Error(`Finnhub API error: ${response.statusText}`);
       }
       const data = await response.json();

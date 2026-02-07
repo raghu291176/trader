@@ -85,6 +85,8 @@ export class StockDataIngestionService {
   private vectorStore: PgVectorStore;
   private sql: ReturnType<typeof neon>;
   private updateIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private twelveData: any;
+  private fmpService: any;
 
   constructor(
     finnhubApiKey: string,
@@ -95,11 +97,14 @@ export class StockDataIngestionService {
       deploymentName: string;
       embeddingDeploymentName?: string;
       apiVersion?: string;
-    }
+    },
+    options?: { twelveDataService?: any; fmpService?: any }
   ) {
     this.finnhub = new FinnhubService(finnhubApiKey);
     this.vectorStore = new PgVectorStore(databaseUrl, azureConfig);
     this.sql = neon(databaseUrl);
+    this.twelveData = options?.twelveDataService || null;
+    this.fmpService = options?.fmpService || null;
   }
 
   /**
@@ -108,15 +113,23 @@ export class StockDataIngestionService {
   async startContinuousIngestion(tickers: string[], intervalMinutes: number = 15): Promise<void> {
     console.log(`📊 Starting continuous ingestion for ${tickers.length} tickers (every ${intervalMinutes} minutes)`);
 
-    // Initial ingestion
+    // Initial ingestion (non-fatal per ticker so server still starts)
     for (const ticker of tickers) {
-      await this.ingestStockData(ticker);
+      try {
+        await this.ingestStockData(ticker);
+      } catch (error) {
+        console.warn(`⚠️  Initial ingestion failed for ${ticker}:`, (error as Error).message);
+      }
     }
 
     // Schedule periodic updates
     for (const ticker of tickers) {
       const interval = setInterval(async () => {
-        await this.ingestStockData(ticker);
+        try {
+          await this.ingestStockData(ticker);
+        } catch (error) {
+          console.warn(`⚠️  Periodic ingestion failed for ${ticker}:`, (error as Error).message);
+        }
       }, intervalMinutes * 60 * 1000);
 
       this.updateIntervals.set(ticker, interval);
@@ -184,11 +197,40 @@ export class StockDataIngestionService {
         sentiment: analysis.sentiment,
       };
 
+      // Populate technical indicators from Twelve Data
+      if (this.twelveData) {
+        try {
+          snapshot.technicalIndicators = await this.twelveData.getIndicatorBundle(ticker);
+        } catch (error) {
+          console.warn(`Twelve Data indicators skipped for ${ticker}:`, (error as Error).message);
+        }
+      }
+
+      // Enrich price target from FMP if Finnhub returned null (premium-only on free tier)
+      if (!snapshot.priceTarget && this.fmpService) {
+        try {
+          const consensus = await this.fmpService.getPriceTargetConsensus(ticker);
+          if (consensus) {
+            snapshot.priceTarget = {
+              targetHigh: consensus.targetHigh,
+              targetMean: consensus.targetConsensus,
+              targetLow: consensus.targetLow,
+            };
+          }
+        } catch (error) {
+          console.warn(`FMP price target skipped for ${ticker}:`, (error as Error).message);
+        }
+      }
+
       // Store in database as timeseries
       await this.storeSnapshot(snapshot);
 
-      // Create embeddings for RAG
-      await this.createEmbeddings(snapshot);
+      // Create embeddings for RAG (non-fatal — app works without embeddings)
+      try {
+        await this.createEmbeddings(snapshot);
+      } catch (embeddingError) {
+        console.warn(`⚠️  Embeddings skipped for ${ticker} (check AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME):`, (embeddingError as Error).message);
+      }
 
       console.log(`✅ Ingested data for ${ticker}`);
       return snapshot;

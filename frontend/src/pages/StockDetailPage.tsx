@@ -1,11 +1,10 @@
 /**
  * Stock Detail Page
- * Dedicated page for viewing comprehensive stock analysis
+ * Semantic HTML5 — article/section/aside structure, mobile-first
  */
 
 import { useParams, useNavigate } from 'react-router-dom'
 import TickerAnalysis from '../components/TickerAnalysis'
-import NewsFeed from '../components/NewsFeed'
 
 export default function StockDetailPage() {
   const { ticker } = useParams<{ ticker: string }>()
@@ -16,30 +15,22 @@ export default function StockDetailPage() {
   }
 
   return (
-    <div className="stock-detail-page">
-      <button
-        className="back-button"
-        onClick={() => navigate(-1)}
-      >
-        <span className="material-symbols-outlined">arrow_back</span>
-        Back to Dashboard
-      </button>
+    <article className="stock-detail-page" aria-label={`${ticker.toUpperCase()} stock analysis`}>
+      <nav className="sd-back-nav" aria-label="Back navigation">
+        <button
+          className="back-button"
+          onClick={() => navigate(-1)}
+        >
+          <span className="material-symbols-outlined">arrow_back</span>
+          Back
+        </button>
+      </nav>
 
-      {/* Render TickerAnalysis inline (not as modal) */}
       <TickerAnalysis
         ticker={ticker.toUpperCase()}
         onClose={() => navigate('/dashboard')}
         inline
       />
-
-      {/* Market News Feed */}
-      <div className="card stock-detail-news-card">
-        <h2>
-          <span className="material-symbols-outlined">newspaper</span>
-          Market News
-        </h2>
-        <NewsFeed ticker={ticker} />
-      </div>
-    </div>
+    </article>
   )
 }
