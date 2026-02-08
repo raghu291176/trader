@@ -5,6 +5,7 @@
  */
 
 import { RateLimiter } from '../utils/rate-limiter.js';
+import { LRUCache } from '../utils/lru-cache.js';
 
 export interface FMPPriceTargetConsensus {
   symbol: string;
@@ -88,9 +89,12 @@ export class FMPService {
   private apiKey: string;
   private baseUrl = 'https://financialmodelingprep.com/api/v3';
   private rateLimiter: RateLimiter;
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
+  private cache = new LRUCache<unknown>(200);
 
   constructor(apiKey: string) {
+    if (!apiKey || apiKey === 'undefined') {
+      throw new Error('FMP API key is required');
+    }
     this.apiKey = apiKey;
     this.rateLimiter = new RateLimiter(250);
   }
@@ -99,24 +103,12 @@ export class FMPService {
     return this.rateLimiter.getRemaining();
   }
 
-  private getCached<T>(key: string, expiryMs: number): T | null {
-    const entry = this.cache.get(key);
-    if (entry && Date.now() - entry.timestamp < expiryMs) {
-      return entry.data as T;
-    }
-    return null;
-  }
-
-  private setCache(key: string, data: any): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
-  }
-
   /**
    * Get analyst consensus price target
    */
   async getPriceTargetConsensus(ticker: string): Promise<FMPPriceTargetConsensus | null> {
     const cacheKey = `ptc:${ticker}`;
-    const cached = this.getCached<FMPPriceTargetConsensus>(cacheKey, 6 * 60 * 60 * 1000); // 6h cache
+    const cached = this.cache.get(cacheKey, 6 * 60 * 60 * 1000) as FMPPriceTargetConsensus | null;
     if (cached) return cached;
 
     try {
@@ -136,7 +128,7 @@ export class FMPService {
         targetMedian: data[0].targetMedian || 0,
       };
 
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
       return result;
     } catch (error) {
       console.error(`Failed to fetch FMP price target consensus for ${ticker}:`, error);
@@ -149,7 +141,7 @@ export class FMPService {
    */
   async getPriceTargets(ticker: string, limit: number = 10): Promise<FMPPriceTarget[]> {
     const cacheKey = `pt:${ticker}`;
-    const cached = this.getCached<FMPPriceTarget[]>(cacheKey, 6 * 60 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 6 * 60 * 60 * 1000) as FMPPriceTarget[] | null;
     if (cached) return cached;
 
     try {
@@ -173,7 +165,7 @@ export class FMPService {
         newsTitle: item.newsTitle || '',
       }));
 
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch FMP price targets for ${ticker}:`, error);
@@ -186,7 +178,7 @@ export class FMPService {
    */
   async getCompanyProfile(ticker: string): Promise<FMPCompanyProfile | null> {
     const cacheKey = `profile:${ticker}`;
-    const cached = this.getCached<FMPCompanyProfile>(cacheKey, 12 * 60 * 60 * 1000); // 12h cache
+    const cached = this.cache.get(cacheKey, 12 * 60 * 60 * 1000) as FMPCompanyProfile | null;
     if (cached) return cached;
 
     try {
@@ -217,7 +209,7 @@ export class FMPService {
         ipoDate: item.ipoDate || '',
       };
 
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
       return result;
     } catch (error) {
       console.error(`Failed to fetch FMP profile for ${ticker}:`, error);
@@ -230,7 +222,7 @@ export class FMPService {
    */
   async getQuote(ticker: string): Promise<FMPQuote | null> {
     const cacheKey = `quote:${ticker}`;
-    const cached = this.getCached<FMPQuote>(cacheKey, 5 * 60 * 1000); // 5min cache
+    const cached = this.cache.get(cacheKey, 5 * 60 * 1000) as FMPQuote | null;
     if (cached) return cached;
 
     try {
@@ -260,7 +252,7 @@ export class FMPService {
         earningsAnnouncement: item.earningsAnnouncement || '',
       };
 
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
       return result;
     } catch (error) {
       console.error(`Failed to fetch FMP quote for ${ticker}:`, error);
@@ -273,7 +265,7 @@ export class FMPService {
    */
   async getSECFilings(ticker: string, type?: string, limit: number = 10): Promise<FMPSECFiling[]> {
     const cacheKey = `sec:${ticker}:${type || 'all'}`;
-    const cached = this.getCached<FMPSECFiling[]>(cacheKey, 4 * 60 * 60 * 1000); // 4h cache
+    const cached = this.cache.get(cacheKey, 4 * 60 * 60 * 1000) as FMPSECFiling[] | null;
     if (cached) return cached;
 
     try {
@@ -299,7 +291,7 @@ export class FMPService {
         fillingDate: item.fillingDate || '',
       }));
 
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch FMP SEC filings for ${ticker}:`, error);
@@ -312,7 +304,7 @@ export class FMPService {
    */
   async getIncomeStatement(ticker: string, period: 'annual' | 'quarter' = 'annual', limit: number = 4): Promise<FMPIncomeStatement[]> {
     const cacheKey = `income:${ticker}:${period}`;
-    const cached = this.getCached<FMPIncomeStatement[]>(cacheKey, 24 * 60 * 60 * 1000); // 24h cache
+    const cached = this.cache.get(cacheKey, 24 * 60 * 60 * 1000) as FMPIncomeStatement[] | null;
     if (cached) return cached;
 
     try {
@@ -337,7 +329,7 @@ export class FMPService {
         netIncomeRatio: item.netIncomeRatio || 0,
       }));
 
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch FMP income statement for ${ticker}:`, error);

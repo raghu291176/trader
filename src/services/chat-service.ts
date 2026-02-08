@@ -125,7 +125,7 @@ export class ChatService {
     await this.vectorStore.addDocuments(documents);
     this.initialized = true;
 
-    console.log(`✅ RAG Initialized with ${await this.vectorStore.getCount()} total embeddings`);
+    console.log(`RAG initialized with ${await this.vectorStore.getCount()} total embeddings`);
   }
 
   /**
@@ -464,7 +464,7 @@ Answer:`;
 
     const allSources = [...publicSourcesList, ...internalSources];
 
-    console.log(`✅ Generated answer with ${allSources.length} sources (${publicSources.length} public, ${internalSources.length} internal), ${actions.length} actions`);
+    console.log(`Generated answer with ${allSources.length} sources (${publicSources.length} public, ${internalSources.length} internal), ${actions.length} actions`);
 
     return {
       answer,

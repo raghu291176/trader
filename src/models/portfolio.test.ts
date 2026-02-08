@@ -117,11 +117,13 @@ describe('Portfolio', () => {
   it('should detect circuit breaker at -30% drawdown', () => {
     const portfolio = new Portfolio(10000);
 
-    portfolio.addPosition('NVDA', 100, 50, 0.8);
+    portfolio.addPosition('NVDA', 100, 100, 0.8); // Buy 100 shares at $100, cash = 0
 
-    const position = portfolio.getPosition('NVDA')!;
-    position.updatePrice(110); // Peak at $110
-    position.updatePrice(77); // Down 30% from peak
+    // Drive price up to set peak via updatePrices
+    portfolio.updatePrices(new Map([['NVDA', 150]])); // Portfolio value = 15000 (peak)
+
+    // Crash price so total value drops > 30% from peak
+    portfolio.updatePrices(new Map([['NVDA', 70]])); // Portfolio value = 7000, drawdown = -53%
 
     const isHit = portfolio.isCircuitBreakerHit(-30);
 

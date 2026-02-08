@@ -5,6 +5,7 @@
  */
 
 import { RateLimiter } from '../utils/rate-limiter.js';
+import { LRUCache } from '../utils/lru-cache.js';
 
 export interface AlphaVantageNewsSentiment {
   title: string;
@@ -50,9 +51,12 @@ export class AlphaVantageService {
   private apiKey: string;
   private baseUrl = 'https://www.alphavantage.co/query';
   private rateLimiter: RateLimiter;
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
+  private cache = new LRUCache<unknown>(100);
 
   constructor(apiKey: string) {
+    if (!apiKey || apiKey === 'undefined') {
+      throw new Error('Alpha Vantage API key is required');
+    }
     this.apiKey = apiKey;
     this.rateLimiter = new RateLimiter(25);
   }
@@ -61,24 +65,12 @@ export class AlphaVantageService {
     return this.rateLimiter.getRemaining();
   }
 
-  private getCached<T>(key: string, expiryMs: number): T | null {
-    const entry = this.cache.get(key);
-    if (entry && Date.now() - entry.timestamp < expiryMs) {
-      return entry.data as T;
-    }
-    return null;
-  }
-
-  private setCache(key: string, data: any): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
-  }
-
   /**
    * Get news with ML-powered sentiment scores
    */
   async getNewsSentiment(tickers?: string[], topics?: string[]): Promise<AlphaVantageNewsSentiment[]> {
     const cacheKey = `news:${tickers?.join(',') || 'general'}:${topics?.join(',') || ''}`;
-    const cached = this.getCached<AlphaVantageNewsSentiment[]>(cacheKey, 4 * 60 * 60 * 1000); // 4h cache
+    const cached = this.cache.get(cacheKey, 4 * 60 * 60 * 1000) as AlphaVantageNewsSentiment[] | null;
     if (cached) return cached;
 
     try {
@@ -121,7 +113,7 @@ export class AlphaVantageService {
         })),
       }));
 
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error('Failed to fetch Alpha Vantage news sentiment:', error);
@@ -134,7 +126,7 @@ export class AlphaVantageService {
    */
   async getCompanyOverview(ticker: string): Promise<AlphaVantageCompanyOverview | null> {
     const cacheKey = `overview:${ticker}`;
-    const cached = this.getCached<AlphaVantageCompanyOverview>(cacheKey, 12 * 60 * 60 * 1000); // 12h cache
+    const cached = this.cache.get(cacheKey, 12 * 60 * 60 * 1000) as AlphaVantageCompanyOverview | null;
     if (cached) return cached;
 
     try {
@@ -181,7 +173,7 @@ export class AlphaVantageService {
         analystTargetPrice: parseFloat(data.AnalystTargetPrice) || 0,
       };
 
-      this.setCache(cacheKey, result);
+      this.cache.set(cacheKey, result);
       return result;
     } catch (error) {
       console.error(`Failed to fetch Alpha Vantage overview for ${ticker}:`, error);

@@ -1,12 +1,14 @@
 /**
  * Token-bucket rate limiter for API services with daily request limits.
  * Refills tokens continuously throughout the day.
+ * Uses a promise queue to prevent race conditions from concurrent callers.
  */
 export class RateLimiter {
   private tokens: number;
   private maxTokens: number;
   private refillRate: number; // tokens per millisecond
   private lastRefill: number;
+  private queue: Promise<void> = Promise.resolve();
 
   constructor(maxRequestsPerDay: number) {
     this.maxTokens = maxRequestsPerDay;
@@ -16,6 +18,12 @@ export class RateLimiter {
   }
 
   async acquire(): Promise<void> {
+    // Chain onto queue to serialize access and prevent race conditions
+    this.queue = this.queue.then(() => this.acquireToken());
+    return this.queue;
+  }
+
+  private async acquireToken(): Promise<void> {
     this.refill();
     if (this.tokens >= 1) {
       this.tokens -= 1;

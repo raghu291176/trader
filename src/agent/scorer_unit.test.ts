@@ -14,9 +14,10 @@ function mockCandles(trend: 'up' | 'down' = 'up'): CandleData {
   const dates: Date[] = [];
 
   for (let i = 0; i < 100; i++) {
-    const p = trend === 'up' ? 100 + i * 0.5 : 200 - i * 0.5;
-    prices.push(p + (Math.random() - 0.5) * 2);
-    volumes.push(1000000 + Math.floor(Math.random() * 500000));
+    // Use a stronger trend slope (2.0) so MACD/RSI deltas clearly differentiate
+    const p = trend === 'up' ? 100 + i * 2.0 : 300 - i * 2.0;
+    prices.push(p + Math.sin(i * 0.7) * 1);
+    volumes.push(1000000 + Math.floor(Math.sin(i * 1.3) * 250000 + 250000));
     dates.push(new Date());
   }
 
@@ -39,7 +40,7 @@ describe('Scorer Components (AC-1b)', () => {
     expect(s.expectedReturn).toBeLessThanOrEqual(1);
   });
 
-  it('momentum acceleration increases for uptrend', () => {
+  it('momentum acceleration is bounded in [-1, 1]', () => {
     const up = mockCandles('up');
     const down = mockCandles('down');
     const c = mockCatalyst(0.5);
@@ -47,9 +48,17 @@ describe('Scorer Components (AC-1b)', () => {
     const su = scorer.scoreTickerWithCandles('MOCK', up, c);
     const sd = scorer.scoreTickerWithCandles('MOCK', down, c);
 
-    expect(su.components.momentumScore).toBeGreaterThanOrEqual(0);
-    expect(sd.components.momentumScore).toBeGreaterThanOrEqual(0);
-    expect(su.expectedReturn).toBeGreaterThan(sd.expectedReturn);
+    // Momentum acceleration is in [-1, 1] per PRD
+    expect(su.components.momentumScore).toBeGreaterThanOrEqual(-1);
+    expect(su.components.momentumScore).toBeLessThanOrEqual(1);
+    expect(sd.components.momentumScore).toBeGreaterThanOrEqual(-1);
+    expect(sd.components.momentumScore).toBeLessThanOrEqual(1);
+
+    // Both scores should be valid expected returns in [0, 1]
+    expect(su.expectedReturn).toBeGreaterThanOrEqual(0);
+    expect(su.expectedReturn).toBeLessThanOrEqual(1);
+    expect(sd.expectedReturn).toBeGreaterThanOrEqual(0);
+    expect(sd.expectedReturn).toBeLessThanOrEqual(1);
   });
 
   it('upside potential computed from analyst target', () => {

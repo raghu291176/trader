@@ -5,6 +5,7 @@
  */
 
 import { RateLimiter } from '../utils/rate-limiter.js';
+import { LRUCache } from '../utils/lru-cache.js';
 
 export interface TwelveDataTimeSeries {
   datetime: string;
@@ -30,9 +31,12 @@ export class TwelveDataService {
   private apiKey: string;
   private baseUrl = 'https://api.twelvedata.com';
   private rateLimiter: RateLimiter;
-  private cache: Map<string, { data: any; timestamp: number }> = new Map();
+  private cache = new LRUCache<unknown>(300);
 
   constructor(apiKey: string) {
+    if (!apiKey || apiKey === 'undefined') {
+      throw new Error('Twelve Data API key is required');
+    }
     this.apiKey = apiKey;
     this.rateLimiter = new RateLimiter(800);
   }
@@ -41,30 +45,19 @@ export class TwelveDataService {
     return this.rateLimiter.getRemaining();
   }
 
-  private getCached<T>(key: string, expiryMs: number): T | null {
-    const entry = this.cache.get(key);
-    if (entry && Date.now() - entry.timestamp < expiryMs) {
-      return entry.data as T;
-    }
-    return null;
-  }
-
-  private setCache(key: string, data: any): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
-  }
-
   private async fetchIndicator(endpoint: string, ticker: string, params: Record<string, string> = {}): Promise<any[]> {
     await this.rateLimiter.acquire();
 
     const searchParams = new URLSearchParams({
       symbol: ticker,
       interval: '1day',
-      apikey: this.apiKey,
       ...params,
     });
 
     const url = `${this.baseUrl}/${endpoint}?${searchParams.toString()}`;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { 'Authorization': `apikey ${this.apiKey}` },
+    });
     if (!response.ok) {
       throw new Error(`Twelve Data API error: ${response.statusText}`);
     }
@@ -84,7 +77,7 @@ export class TwelveDataService {
   async getTimeSeries(ticker: string, interval: string = '1day', outputsize: number = 100): Promise<TwelveDataTimeSeries[]> {
     const cacheKey = `ts:${ticker}:${interval}:${outputsize}`;
     const cacheMs = interval === '1day' ? 15 * 60 * 1000 : 5 * 60 * 1000;
-    const cached = this.getCached<TwelveDataTimeSeries[]>(cacheKey, cacheMs);
+    const cached = this.cache.get(cacheKey, cacheMs) as TwelveDataTimeSeries[] | null;
     if (cached) return cached;
 
     try {
@@ -94,11 +87,12 @@ export class TwelveDataService {
         symbol: ticker,
         interval,
         outputsize: String(outputsize),
-        apikey: this.apiKey,
       });
 
       const url = `${this.baseUrl}/time_series?${searchParams.toString()}`;
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { 'Authorization': `apikey ${this.apiKey}` },
+      });
       if (!response.ok) return [];
 
       const data: any = await response.json();
@@ -113,7 +107,7 @@ export class TwelveDataService {
         volume: parseInt(v.volume) || 0,
       }));
 
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data time series for ${ticker}:`, error);
@@ -126,7 +120,7 @@ export class TwelveDataService {
    */
   async getRSI(ticker: string, period: number = 14): Promise<Array<{ datetime: string; rsi: number }>> {
     const cacheKey = `rsi:${ticker}:${period}`;
-    const cached = this.getCached<Array<{ datetime: string; rsi: number }>>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as Array<{ datetime: string; rsi: number }> | null;
     if (cached) return cached;
 
     try {
@@ -135,7 +129,7 @@ export class TwelveDataService {
         datetime: v.datetime || '',
         rsi: parseFloat(v.rsi) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data RSI for ${ticker}:`, error);
@@ -148,7 +142,7 @@ export class TwelveDataService {
    */
   async getMACD(ticker: string): Promise<Array<{ datetime: string; macd: number; macd_signal: number; macd_hist: number }>> {
     const cacheKey = `macd:${ticker}`;
-    const cached = this.getCached<any[]>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as any[] | null;
     if (cached) return cached;
 
     try {
@@ -159,7 +153,7 @@ export class TwelveDataService {
         macd_signal: parseFloat(v.macd_signal) || 0,
         macd_hist: parseFloat(v.macd_hist) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data MACD for ${ticker}:`, error);
@@ -172,7 +166,7 @@ export class TwelveDataService {
    */
   async getBollingerBands(ticker: string): Promise<Array<{ datetime: string; upper_band: number; middle_band: number; lower_band: number }>> {
     const cacheKey = `bbands:${ticker}`;
-    const cached = this.getCached<any[]>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as any[] | null;
     if (cached) return cached;
 
     try {
@@ -183,7 +177,7 @@ export class TwelveDataService {
         middle_band: parseFloat(v.middle_band) || 0,
         lower_band: parseFloat(v.lower_band) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data Bollinger Bands for ${ticker}:`, error);
@@ -196,7 +190,7 @@ export class TwelveDataService {
    */
   async getStochastic(ticker: string): Promise<Array<{ datetime: string; slow_k: number; slow_d: number }>> {
     const cacheKey = `stoch:${ticker}`;
-    const cached = this.getCached<any[]>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as any[] | null;
     if (cached) return cached;
 
     try {
@@ -206,7 +200,7 @@ export class TwelveDataService {
         slow_k: parseFloat(v.slow_k) || 0,
         slow_d: parseFloat(v.slow_d) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data Stochastic for ${ticker}:`, error);
@@ -219,7 +213,7 @@ export class TwelveDataService {
    */
   async getADX(ticker: string, period: number = 14): Promise<Array<{ datetime: string; adx: number }>> {
     const cacheKey = `adx:${ticker}:${period}`;
-    const cached = this.getCached<any[]>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as any[] | null;
     if (cached) return cached;
 
     try {
@@ -228,7 +222,7 @@ export class TwelveDataService {
         datetime: v.datetime || '',
         adx: parseFloat(v.adx) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data ADX for ${ticker}:`, error);
@@ -241,7 +235,7 @@ export class TwelveDataService {
    */
   async getATR(ticker: string, period: number = 14): Promise<Array<{ datetime: string; atr: number }>> {
     const cacheKey = `atr:${ticker}:${period}`;
-    const cached = this.getCached<any[]>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as any[] | null;
     if (cached) return cached;
 
     try {
@@ -250,7 +244,7 @@ export class TwelveDataService {
         datetime: v.datetime || '',
         atr: parseFloat(v.atr) || 0,
       }));
-      this.setCache(cacheKey, results);
+      this.cache.set(cacheKey, results);
       return results;
     } catch (error) {
       console.error(`Failed to fetch Twelve Data ATR for ${ticker}:`, error);
@@ -264,7 +258,7 @@ export class TwelveDataService {
    */
   async getIndicatorBundle(ticker: string): Promise<TwelveDataIndicatorBundle> {
     const cacheKey = `bundle:${ticker}`;
-    const cached = this.getCached<TwelveDataIndicatorBundle>(cacheKey, 15 * 60 * 1000);
+    const cached = this.cache.get(cacheKey, 15 * 60 * 1000) as TwelveDataIndicatorBundle | null;
     if (cached) return cached;
 
     const [rsiData, macdData, bbandsData, stochData, adxData] = await Promise.all([
@@ -323,7 +317,7 @@ export class TwelveDataService {
       adx: latestADX,
     };
 
-    this.setCache(cacheKey, bundle);
+    this.cache.set(cacheKey, bundle);
     return bundle;
   }
 }

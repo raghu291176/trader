@@ -8,6 +8,8 @@ import { Document } from '@langchain/core/documents';
 import { FinnhubService } from './finnhub-service.js';
 import { PgVectorStore } from './pgvector-store.js';
 import { neon } from '@neondatabase/serverless';
+import type { TwelveDataService } from './twelve-data-service.js';
+import type { FMPService } from './fmp-service.js';
 
 export interface StockDataSnapshot {
   ticker: string;
@@ -85,8 +87,10 @@ export class StockDataIngestionService {
   private vectorStore: PgVectorStore;
   private sql: ReturnType<typeof neon>;
   private updateIntervals: Map<string, NodeJS.Timeout> = new Map();
-  private twelveData: any;
-  private fmpService: any;
+  private twelveData: TwelveDataService | null;
+  private fmpService: FMPService | null;
+  private failureCounts: Map<string, number> = new Map();
+  private static readonly MAX_CONSECUTIVE_FAILURES = 5;
 
   constructor(
     finnhubApiKey: string,
@@ -98,7 +102,7 @@ export class StockDataIngestionService {
       embeddingDeploymentName?: string;
       apiVersion?: string;
     },
-    options?: { twelveDataService?: any; fmpService?: any }
+    options?: { twelveDataService?: TwelveDataService; fmpService?: FMPService }
   ) {
     this.finnhub = new FinnhubService(finnhubApiKey);
     this.vectorStore = new PgVectorStore(databaseUrl, azureConfig);
@@ -111,24 +115,34 @@ export class StockDataIngestionService {
    * Start continuous data ingestion for a list of tickers
    */
   async startContinuousIngestion(tickers: string[], intervalMinutes: number = 15): Promise<void> {
-    console.log(`📊 Starting continuous ingestion for ${tickers.length} tickers (every ${intervalMinutes} minutes)`);
+    console.log(`Starting continuous ingestion for ${tickers.length} tickers (every ${intervalMinutes} minutes)`);
 
     // Initial ingestion (non-fatal per ticker so server still starts)
     for (const ticker of tickers) {
       try {
         await this.ingestStockData(ticker);
+        this.failureCounts.set(ticker, 0);
       } catch (error) {
-        console.warn(`⚠️  Initial ingestion failed for ${ticker}:`, (error as Error).message);
+        console.warn(`Initial ingestion failed for ${ticker}:`, (error as Error).message);
+        this.failureCounts.set(ticker, 1);
       }
     }
 
     // Schedule periodic updates
     for (const ticker of tickers) {
       const interval = setInterval(async () => {
+        const failures = this.failureCounts.get(ticker) || 0;
+        if (failures >= StockDataIngestionService.MAX_CONSECUTIVE_FAILURES) {
+          console.error(`Ingestion suspended for ${ticker} after ${failures} consecutive failures`);
+          return;
+        }
         try {
           await this.ingestStockData(ticker);
+          this.failureCounts.set(ticker, 0);
         } catch (error) {
-          console.warn(`⚠️  Periodic ingestion failed for ${ticker}:`, (error as Error).message);
+          const newCount = failures + 1;
+          this.failureCounts.set(ticker, newCount);
+          console.warn(`Periodic ingestion failed for ${ticker} (${newCount}/${StockDataIngestionService.MAX_CONSECUTIVE_FAILURES}):`, (error as Error).message);
         }
       }, intervalMinutes * 60 * 1000);
 
@@ -142,16 +156,21 @@ export class StockDataIngestionService {
   stopContinuousIngestion(): void {
     for (const [ticker, interval] of this.updateIntervals.entries()) {
       clearInterval(interval);
-      console.log(`🛑 Stopped ingestion for ${ticker}`);
+      console.log(`Stopped ingestion for ${ticker}`);
     }
     this.updateIntervals.clear();
+    this.failureCounts.clear();
+  }
+
+  getFailureCounts(): ReadonlyMap<string, number> {
+    return this.failureCounts;
   }
 
   /**
    * Ingest comprehensive stock data for a single ticker
    */
   async ingestStockData(ticker: string): Promise<StockDataSnapshot> {
-    console.log(`📥 Ingesting data for ${ticker}...`);
+    console.log(`Ingesting data for ${ticker}...`);
 
     try {
       // Fetch all data from Finnhub
@@ -229,13 +248,13 @@ export class StockDataIngestionService {
       try {
         await this.createEmbeddings(snapshot);
       } catch (embeddingError) {
-        console.warn(`⚠️  Embeddings skipped for ${ticker} (check AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME):`, (embeddingError as Error).message);
+        console.warn(`Embeddings skipped for ${ticker} (check AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME):`, (embeddingError as Error).message);
       }
 
-      console.log(`✅ Ingested data for ${ticker}`);
+      console.log(`Ingested data for ${ticker}`);
       return snapshot;
     } catch (error) {
-      console.error(`❌ Failed to ingest data for ${ticker}:`, error);
+      console.error(`Failed to ingest data for ${ticker}:`, error);
       throw error;
     }
   }

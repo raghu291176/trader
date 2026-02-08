@@ -160,6 +160,18 @@ export class Scorer {
    * Calculate rotation threshold
    * Per PRD Section 6: Threshold = 0.02 for aggressive rotation
    */
+  /**
+   * Apply momentum acceleration curve.
+   * Scores above 0.5 are boosted, scores below 0.5 are depressed.
+   * Uses a power curve: result = score^(1/1.5) for high, score^1.5 for low.
+   */
+  applyMomentumAcceleration(score: number): number {
+    if (score >= 0.5) {
+      return Math.pow(score, 1 / 1.5);
+    }
+    return Math.pow(score, 1.5);
+  }
+
   getRotationThreshold(): number {
     return 0.02; // 2% differential triggers rotation
   }

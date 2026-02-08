@@ -4,6 +4,8 @@
  */
 
 import { FinnhubService } from './finnhub-service.js';
+import type { AlphaVantageService } from './alpha-vantage-service.js';
+import type { FMPService } from './fmp-service.js';
 
 export interface PublicSource {
   type: 'news' | 'sec_filing' | 'analyst_report' | 'social_media' | 'market_data';
@@ -17,10 +19,10 @@ export interface PublicSource {
 
 export class PublicSourcesSearchService {
   private finnhub: FinnhubService;
-  private alphaVantage: any;
-  private fmpService: any;
+  private alphaVantage: AlphaVantageService | null;
+  private fmpService: FMPService | null;
 
-  constructor(finnhubApiKey: string, options?: { alphaVantageService?: any; fmpService?: any }) {
+  constructor(finnhubApiKey: string, options?: { alphaVantageService?: AlphaVantageService; fmpService?: FMPService }) {
     this.finnhub = new FinnhubService(finnhubApiKey);
     this.alphaVantage = options?.alphaVantageService || null;
     this.fmpService = options?.fmpService || null;
@@ -159,7 +161,7 @@ export class PublicSourcesSearchService {
 
     try {
       const filings = await this.fmpService.getSECFilings(ticker, undefined, 5);
-      return filings.map((filing: any) => ({
+      return filings.map((filing) => ({
         type: 'sec_filing' as const,
         source: `SEC EDGAR (${filing.type})`,
         title: `${ticker} ${filing.type} Filing`,
@@ -226,7 +228,7 @@ export class PublicSourcesSearchService {
 
     try {
       const newsItems = await this.alphaVantage.getNewsSentiment(undefined, [query]);
-      return newsItems.slice(0, 5).map((item: any) => ({
+      return newsItems.slice(0, 5).map((item) => ({
         type: 'news' as const,
         source: item.source || 'Alpha Vantage News',
         title: item.title || '',
@@ -242,21 +244,35 @@ export class PublicSourcesSearchService {
   }
 
   /**
-   * Extract ticker symbol from query
+   * Extract ticker symbol from query.
+   * Filters out common English words and abbreviations that match
+   * the all-caps pattern but are not stock tickers.
    */
   private extractTicker(query: string): string | null {
-    // Match common ticker patterns (all caps, 1-5 letters)
     const tickerPattern = /\b([A-Z]{1,5})\b/g;
     const matches = query.match(tickerPattern);
 
-    if (matches && matches.length > 0) {
-      // Return the first match that looks like a ticker
-      // Filter out common words like "I", "A", "THE", etc.
-      const commonWords = ['I', 'A', 'THE', 'IN', 'ON', 'AT', 'TO', 'FOR', 'OF', 'AND', 'OR', 'BUT'];
-      for (const match of matches) {
-        if (!commonWords.includes(match) && match.length >= 2) {
-          return match;
-        }
+    if (!matches || matches.length === 0) return null;
+
+    const commonWords = new Set([
+      'I', 'A', 'THE', 'IN', 'ON', 'AT', 'TO', 'FOR', 'OF', 'AND', 'OR', 'BUT',
+      'IS', 'IT', 'IF', 'DO', 'SO', 'NO', 'UP', 'BY', 'AN', 'AM', 'AS', 'BE',
+      'GO', 'HE', 'ME', 'MY', 'OK', 'US', 'WE',
+      'ALL', 'ARE', 'CAN', 'DID', 'GET', 'GOT', 'HAS', 'HAD', 'HER', 'HIM',
+      'HIS', 'HOW', 'ITS', 'LET', 'MAY', 'NEW', 'NOT', 'NOW', 'OLD', 'OUR',
+      'OUT', 'OWN', 'SAY', 'SHE', 'TOO', 'USE', 'WAY', 'WHO', 'WHY', 'YET',
+      'USA', 'FBI', 'CIA', 'CEO', 'CFO', 'CTO', 'COO', 'IPO', 'ETF', 'GDP',
+      'API', 'FAQ', 'PDF', 'URL', 'NYSE', 'SEC',
+      'BUY', 'SELL', 'HOLD', 'LONG', 'SHORT', 'CALL', 'PUT',
+      'HIGH', 'LOW', 'OPEN', 'CLOSE', 'PRICE', 'STOCK', 'TRADE',
+      'WHAT', 'WHEN', 'THIS', 'THAT', 'WITH', 'FROM', 'HAVE', 'WILL',
+      'BEEN', 'WERE', 'THEM', 'THAN', 'EACH', 'MAKE', 'LIKE', 'JUST',
+      'OVER', 'SUCH', 'TAKE', 'YEAR', 'SOME', 'ALSO', 'BACK', 'MUCH',
+    ]);
+
+    for (const match of matches) {
+      if (match.length >= 1 && !commonWords.has(match)) {
+        return match;
       }
     }
 
